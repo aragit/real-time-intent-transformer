@@ -164,5 +164,9 @@ This is an active portfolio project. Contributions welcome in:
 
 📄 License
 MIT License — AI Engineering Portfolio
+---
 
-Built with FastAPI, Polars, Kafka, and a deep respect for deterministic reasoning.
+<p align="center">
+  <sub>Built with FastAPI, Polars, Kafka, and a deep respect for deterministic reasoning.</sub>
+</p>
+
