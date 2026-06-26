@@ -1,3 +1,23 @@
+<h1 align="center">Real-Time Intent Transformer</h1>
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.12-blue" alt="Python">
+  <img src="https://img.shields.io/badge/FastAPI-009688" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Polars-CD792C" alt="Polars">
+  <img src="https://img.shields.io/badge/Kafka-231F20" alt="Kafka">
+  <img src="https://img.shields.io/badge/OPA-7D9199" alt="OPA">
+  <img src="https://img.shields.io/badge/scikit--learn-F7931E" alt="scikit-learn">
+  <img src="https://img.shields.io/badge/XGBoost-EB4226" alt="XGBoost">
+  <img src="https://img.shields.io/badge/Pydantic-E92063" alt="Pydantic">
+  <img src="https://img.shields.io/badge/pytest-0A9EDC" alt="pytest">
+  <img src="https://img.shields.io/badge/Docker-2496ED" alt="Docker">
+  <img src="https://img.shields.io/badge/GitHub%20Actions-2088FF" alt="GitHub Actions">
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+</p>
+
+<p align="center">
+  <b>A real-time e-commerce intent classification system that ingests clickstream events, engineers behavioral features with Polars, classifies shopping intent via rule-based heuristics and Markov chain state transitions, and triggers adaptive actions with governance guardrails.</b>
+</p>
+
 # Real-Time Intent Transformer
 
 A real-time e-commerce intent classification system that ingests clickstream events, engineers behavioral features with Polars, classifies shopping intent via rule-based heuristics and Markov chain state transitions, and triggers adaptive actions with governance guardrails.
