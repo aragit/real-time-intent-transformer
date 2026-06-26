@@ -13,4 +13,4 @@ class CustomerProfile(BaseModel):
     avg_session_duration: float = 0.0
     preferred_categories: List[str] = Field(default_factory=list)
     intent_history: List[IntentPrediction] = Field(default_factory=list)
-    last_updated: datetime = Field(default_factory=datetime.utcnow)
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -27,4 +27,4 @@ class SessionFeatures(BaseModel):
     action_sequence: List[str] = Field(default_factory=list)
     repeat_customer: bool = False
     days_since_last_purchase: Optional[int] = None
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -22,26 +22,39 @@ def _get_producer() -> ClickstreamProducer:
 
 @router.post("/events/ingest", status_code=status.HTTP_202_ACCEPTED)
 async def ingest_event(event: ClickEvent):
-    """Ingest a single click event."""
-    producer = _get_producer()
-    await producer.start()
+    """Ingest a single click event. Stores to SQLite; Kafka is best-effort."""
+    # Always store to SQLite (primary persistence)
+    _store.insert(event)
+    
+    # Best-effort Kafka publish
     try:
-        await producer.send_event(event)
-        _store.insert(event)
-    finally:
-        await producer.stop()
+        producer = _get_producer()
+        await producer.start()
+        try:
+            await producer.send_event(event)
+        finally:
+            await producer.stop()
+    except Exception:
+        pass  # Kafka unavailable — SQLite has the event
+    
     return {"status": "accepted", "event_id": event.event_id}
 
 
 @router.post("/events/ingest/batch", status_code=status.HTTP_202_ACCEPTED)
 async def ingest_batch(events: List[ClickEvent]):
-    """Ingest a batch of click events."""
-    producer = _get_producer()
-    await producer.start()
+    """Ingest a batch of click events. Stores to SQLite; Kafka is best-effort."""
+    for event in events:
+        _store.insert(event)
+    
+    # Best-effort Kafka publish
     try:
-        await producer.send_batch(events)
-        for event in events:
-            _store.insert(event)
-    finally:
-        await producer.stop()
+        producer = _get_producer()
+        await producer.start()
+        try:
+            await producer.send_batch(events)
+        finally:
+            await producer.stop()
+    except Exception:
+        pass  # Kafka unavailable — SQLite has all events
+    
     return {"status": "accepted", "count": len(events)}

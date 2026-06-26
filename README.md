@@ -157,6 +157,39 @@ Example Response (Intent Prediction)
   "generated_at": "2024-01-15T10:30:00Z"
 }
 ```
+## Synthetic Data Generation 
+
+Generated 34148 events across 5000 sessions → data/synthetic_clicks.csv
+shape: (7, 2)
+┌─────────────────────┬──────┐
+│ ground_truth_intent ┆ len  │
+│ ---                 ┆ ---  │
+│ str                 ┆ u32  │
+╞═════════════════════╪══════╡
+│ BROWSE              ┆ 7180 │
+│ PRICE_SENSITIVE     ┆ 7070 │
+│ COMPARE             ┆ 6880 │
+│ CART_BUILDER        ┆ 5824 │
+│ CHECKOUT_INTENT     ┆ 3610 │
+│ LOYAL_RETURNER      ┆ 2130 │
+│ CHURN_RISK          ┆ 1454 │
+└─────────────────────┴──────┘
+                 precision    recall  f1-score   support
+
+         BROWSE       1.00      1.00      1.00       144
+   CART_BUILDER       1.00      1.00      1.00       146
+CHECKOUT_INTENT       1.00      1.00      1.00       144
+     CHURN_RISK       1.00      1.00      1.00       145
+        COMPARE       1.00      1.00      1.00       138
+ LOYAL_RETURNER       1.00      1.00      1.00       142
+PRICE_SENSITIVE       1.00      1.00      1.00       141
+
+       accuracy                           1.00      1000
+      macro avg       1.00      1.00      1.00      1000
+   weighted avg       1.00      1.00      1.00      1000
+
+Model saved to models/intent_classifier.joblib
+
 
 ## 🧪 Test
 

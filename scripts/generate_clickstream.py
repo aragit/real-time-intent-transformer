@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
 Generate synthetic labeled clickstream data for training the intent classifier.
-Ground-truth intent is determined by construction (we control the behavior pattern).
 """
 
+import json
+import os
 import random
 import uuid
 from datetime import datetime, timedelta
@@ -77,7 +78,6 @@ def generate_session(intent: str, session_id: str, start_time: datetime) -> list
     value = random.randint(*profile["value_range"]) if profile["value_range"][1] > 0 else 0
 
     for i, action in enumerate(actions):
-        # Time between events: 10-120 seconds
         current_time += timedelta(seconds=random.randint(10, 120))
         event = {
             "event_id": str(uuid.uuid4())[:12],
@@ -88,15 +88,13 @@ def generate_session(intent: str, session_id: str, start_time: datetime) -> list
             "product_id": f"prod_{random.randint(1, 500)}",
             "category": random.choice(categories),
             "value": value if action in ("add_to_cart", "checkout_start", "purchase_complete") else None,
-            "metadata": {},
+            "metadata": json.dumps({}),  # Flattened for CSV
         }
         if action == "search_query":
-            event["metadata"] = {"query": f"search for {random.choice(categories)}"}
+            event["metadata"] = json.dumps({"query": f"search for {random.choice(categories)}"})
         events.append(event)
 
-    # Add metadata for churn/loyal profiles
     if profile.get("long_session"):
-        # Extend last event timestamp to make session > 10 min
         events[-1]["timestamp"] = (start_time + timedelta(minutes=12)).isoformat()
 
     return events
@@ -118,12 +116,11 @@ def generate_dataset(n_sessions: int = 5000, output_path: str = "data/synthetic_
         all_events.extend(events)
 
     df = pl.DataFrame(all_events)
+    os.makedirs("data", exist_ok=True)
     df.write_csv(output_path)
     print(f"Generated {len(all_events)} events across {n_sessions} sessions → {output_path}")
     print(df.group_by("ground_truth_intent").agg(pl.len()).sort("len", descending=True))
 
 
 if __name__ == "__main__":
-    import os
-    os.makedirs("data", exist_ok=True)
     generate_dataset()

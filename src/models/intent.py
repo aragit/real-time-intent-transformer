@@ -12,4 +12,4 @@ class IntentPrediction(BaseModel):
     method: str  # rule_based, ml_ensemble, markov_chain
     features: SessionFeatures
     predicted_next_state: Optional[str] = None
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -11,6 +11,6 @@ class ActionDispatch(BaseModel):
     confidence: float
     action: str  # APPLY_DISCOUNT, SHOW_URGENCY, SEND_ABANDON_EMAIL, RECOMMEND_ALTERNATIVE, LOYALTY_REWARD, NO_ACTION
     reason: Optional[str] = None
-    dispatched_at: datetime = Field(default_factory=datetime.utcnow)
+    dispatched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     acknowledged: bool = False
     outcome: Optional[str] = None  # clicked, converted, ignored (stub)

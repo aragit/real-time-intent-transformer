@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """
 Train sklearn RandomForest on synthetic clickstream data.
-Saves model to models/intent_classifier.joblib for MLEnsembleClassifier.
 """
 
+import json
 import os
+import sys
+
+# Add project root to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import joblib
 import polars as pl
@@ -14,7 +18,6 @@ from sklearn.metrics import classification_report
 
 from src.perception.feature_engineer import FeatureEngineer
 from src.models.events import ClickEvent
-from src.reasoning.ml_ensemble import MLEnsembleClassifier
 
 
 def load_events(path: str = "data/synthetic_clicks.csv") -> pl.DataFrame:
@@ -22,15 +25,14 @@ def load_events(path: str = "data/synthetic_clicks.csv") -> pl.DataFrame:
 
 
 def events_to_features(df: pl.DataFrame) -> tuple:
-    """Group by session, engineer features, extract labels."""
     engineer = FeatureEngineer()
     sessions = df.group_by("session_id").agg(pl.all().sort_by("timestamp"))
 
     X, y = [], []
     for session in sessions.iter_rows(named=True):
-        # Reconstruct events
         events = []
-        for i in range(len(session["event_id"])):
+        n_events = len(session["event_id"])
+        for i in range(n_events):
             events.append(ClickEvent(
                 event_id=session["event_id"][i],
                 session_id=session["session_id"],
@@ -40,7 +42,7 @@ def events_to_features(df: pl.DataFrame) -> tuple:
                 product_id=session["product_id"][i],
                 category=session["category"][i],
                 value=session["value"][i] if session["value"][i] is not None else None,
-                metadata={},
+                metadata=json.loads(session["metadata"][i]) if session["metadata"][i] else {},
             ))
         features = engineer.engineer(events)
         X.append([
