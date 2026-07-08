@@ -38,7 +38,7 @@ E-commerce platforms lose revenue because they treat all users the same. A user 
 
 ### Architecture Paradigm
 
-7-layer pipeline aligned with AXIOMIS neuro-symbolic stack:
+7-layer pipeline aligned with [neuro-symbolic stack](https://aragit.github.io/architecture.html#deterministic):
 
 | Layer | Component | Technology | Role |
 |-------|-----------|------------|------|
