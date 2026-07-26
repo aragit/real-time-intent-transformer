@@ -165,11 +165,12 @@ End-to-end distributed tracing operates with zero-config setup across the stack:
 | **Evaluator Agent** | `@observe()` decorator | Background batch traces, LLM analysis spans |
 
 **Key Tracing Capabilities**
-System 1 (Fast-Path Latency): Tracks deterministic policy evaluations via @observe() decorators to ensure compliance checks remain under target thresholds (<= 15ms).
 
-System 2 (LangGraph Execution): Injects a native CallbackHandler into graph invocations (graph.ainvoke), capturing nested node execution trees (__start__ -> route_by_complexity -> system_1_fast_path -> __end__), along with input feature flags and output routing decisions.
+- System 1 (Fast-Path Latency): Tracks deterministic policy evaluations via @observe() decorators to ensure compliance checks remain under target thresholds (<= 15ms).
 
-Meta-Cognition Evaluators: Records background drift detection runs and batch confidence scores into decoupled trace scopes.
+- System 2 (LangGraph Execution): Injects a native CallbackHandler into graph invocations (graph.ainvoke), capturing nested node execution trees (__start__ -> route_by_complexity -> system_1_fast_path -> __end__), along with input feature flags and output routing decisions.
+
+- Meta-Cognition Evaluators: Records background drift detection runs and batch confidence scores into decoupled trace scopes.
 
 
 
