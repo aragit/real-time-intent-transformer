@@ -126,7 +126,36 @@ A persistent background worker periodically:
 
 ## Observability — Langfuse Integration
 
-End-to-end distributed tracing via [Langfuse](https://langfuse.com) with zero-config setup:
+This engine uses [Langfuse](https://langfuse.com) for real-time observability across both deterministic policy routes and agentic decision flows.
+
+```
+       ┌─────────────────────────────────────────────────────────┐
+       │                   FastAPI / API Route                   │
+       └────────────────────────────┬────────────────────────────┘
+                                    │
+            ┌───────────────────────┴───────────────────────┐
+            ▼                                               ▼
+┌─────────────────────────┐                     ┌─────────────────────────┐
+│       System 1          │                     │        System 2         │
+│  Fast-Path / OPA Policy │                     │  LangGraph Multi-Agent  │
+└───────────┬─────────────┘                     └───────────┬─────────────┘
+            │                                               │
+            ▼                                               ▼
+   [@observe Decorator]                          [Langfuse CallbackHandler]
+   - Latency tracking (<15ms)                    - Node-by-node state spans
+   - Fallback evaluations                        - Graph state inputs/outputs
+            │                                               │
+            └───────────────────────┬───────────────────────┘
+                                    │
+                                    ▼
+                      ┌───────────────────────────┐
+                      │      Langfuse Cloud       │
+                      │  Tracing & Analytics UI   │
+                      └───────────────────────────┘
+
+```
+End-to-end distributed tracing operates with zero-config setup across the stack:
+
 
 | Component | Tracing | What's Captured |
 |-----------|---------|-----------------|
@@ -134,6 +163,15 @@ End-to-end distributed tracing via [Langfuse](https://langfuse.com) with zero-co
 | **Classify Endpoint** | `@observe()` decorator | Full request lifecycle for intent prediction |
 | **LangGraph Orchestrator** | `CallbackHandler` | Planner, GraphRAG tools, Critic agent as nested spans |
 | **Evaluator Agent** | `@observe()` decorator | Background batch traces, LLM analysis spans |
+
+**Key Tracing Capabilities**
+System 1 (Fast-Path Latency): Tracks deterministic policy evaluations via @observe() decorators to ensure compliance checks remain under target thresholds (<= 15ms).
+
+System 2 (LangGraph Execution): Injects a native CallbackHandler into graph invocations (graph.ainvoke), capturing nested node execution trees (__start__ -> route_by_complexity -> system_1_fast_path -> __end__), along with input feature flags and output routing decisions.
+
+Meta-Cognition Evaluators: Records background drift detection runs and batch confidence scores into decoupled trace scopes.
+
+
 
 ### Configuration
 
@@ -144,6 +182,8 @@ LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
 LANGFUSE_HOST=http://localhost:3000  # default
 ```
+
+*Note on Testing: The test suite automatically disables external telemetry network requests via LANGFUSE_SDK_DISABLED=true in tests/conftest.py to prevent suite latency or external network dependency failures.*
 
 Traces are automatically exported as nested spans within the main request trace, giving you full visibility into:
 - Which path (System 1 vs System 2) was taken and why
@@ -378,7 +418,7 @@ pytest tests/test_orchestrator.py -v     # Orchestrator graph tests
 | LOYAL_RETURNER | 1.00 | 1.00 | 1.00 | 142 |
 | PRICE_SENSITIVE | 1.00 | 1.00 | 1.00 | 141 |
 
-**Accuracy:** 1.00 | **Macro F1:** 1.00 | **Weighted F1:** 1.00
+
 
 ---
 
