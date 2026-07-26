@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic_settings import BaseSettings
 from pydantic import Field, ConfigDict
 
@@ -19,6 +21,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     use_pg_ledger: bool = Field(default=False)
     postgres_dsn: str = "postgresql://postgres:postgres@localhost:5432/intent_transformer"
+    postgres_read_replica_dsn: Optional[str] = None
     neo4j_uri: str = "bolt://localhost:7687"
     neo4j_user: str = "neo4j"
     neo4j_password: str = "password"

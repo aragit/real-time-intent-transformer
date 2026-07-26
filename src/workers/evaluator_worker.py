@@ -14,6 +14,11 @@ import asyncio
 from loguru import logger
 
 from src.agents.evaluator import get_evaluator, close_evaluator
+from src.observability.metrics import (
+    EVALUATOR_DRIFT_FLAGGED,
+    EVALUATOR_BATCH_CONVERSION_RATE,
+    EVALUATOR_BATCH_ACTIONS,
+)
 
 
 async def start_evaluator_loop(interval_seconds: int = 300, batch_size: int = 100) -> None:
@@ -41,6 +46,11 @@ async def start_evaluator_loop(interval_seconds: int = 300, batch_size: int = 10
             await asyncio.sleep(interval_seconds)
 
             metrics = await evaluator.run_evaluation_batch(batch_size=batch_size)
+
+            # Update Prometheus gauges for drift alerting
+            EVALUATOR_DRIFT_FLAGGED.set(1 if metrics.drift_flagged else 0)
+            EVALUATOR_BATCH_CONVERSION_RATE.set(metrics.conversion_rate)
+            EVALUATOR_BATCH_ACTIONS.inc(metrics.actions_evaluated)
 
             if metrics.drift_flagged:
                 logger.warning(

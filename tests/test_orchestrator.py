@@ -163,7 +163,7 @@ class TestGraphExecution:
                 intent="PRICE_SENSITIVE",
             )
 
-            final_state = await graph.ainvoke(initial_state)
+            final_state = await graph.ainvoke(initial_state, config={"configurable": {"thread_id": "test"}})
 
         # Verify state transitions
         assert final_state["system"] == "system_2"
@@ -208,7 +208,7 @@ class TestGraphExecution:
                 intent="BROWSE",
             )
 
-            final_state = await graph.ainvoke(initial_state)
+            final_state = await graph.ainvoke(initial_state, config={"configurable": {"thread_id": "test"}})
 
         assert final_state["proposed_action"] == "SHOW_URGENCY"
         assert final_state["opa_evaluation"]["allowed"] is True
@@ -249,7 +249,7 @@ class TestGraphExecution:
                 intent="CHURN_RISK",
             )
 
-            final_state = await graph.ainvoke(initial_state)
+            final_state = await graph.ainvoke(initial_state, config={"configurable": {"thread_id": "test"}})
 
         assert final_state["proposed_action"] == "OFFER_DISCOUNT"
         assert final_state["opa_evaluation"]["allowed"] is False
@@ -277,7 +277,7 @@ class TestGraphExecution:
             graph = build_orchestrator_graph()
             initial_state = _make_state(confidence=0.92, intent="CHECKOUT_INTENT")
 
-            final_state = await graph.ainvoke(initial_state)
+            final_state = await graph.ainvoke(initial_state, config={"configurable": {"thread_id": "test"}})
 
         assert final_state["system"] == "system_1"
         assert final_state["result"]["source"] == "system_1"
@@ -314,7 +314,7 @@ class TestGraphExecution:
             graph = build_orchestrator_graph()
             initial_state = _make_state(confidence=0.50)
 
-            final_state = await graph.ainvoke(initial_state)
+            final_state = await graph.ainvoke(initial_state, config={"configurable": {"thread_id": "test"}})
 
         # All new keys must be present and non-None
         assert final_state["proposed_action"] is not None

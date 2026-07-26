@@ -12,3 +12,17 @@ ACTIONS_SUPPRESSED = Counter("actions_suppressed_total", "Actions suppressed")
 
 # Session metrics
 ACTIVE_SESSIONS = Gauge("active_sessions", "Currently active sessions")
+
+# Evaluator / drift metrics
+EVALUATOR_DRIFT_FLAGGED = Gauge(
+    "evaluator_drift_flagged",
+    "Model drift flag indicator (1=drifted, 0=normal)",
+)
+EVALUATOR_BATCH_CONVERSION_RATE = Gauge(
+    "evaluator_batch_conversion_rate",
+    "Conversion rate of the most recent evaluation batch",
+)
+EVALUATOR_BATCH_ACTIONS = Counter(
+    "evaluator_actions_evaluated_total",
+    "Total actions evaluated across all batches",
+)

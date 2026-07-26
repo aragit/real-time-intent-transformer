@@ -6,20 +6,23 @@ deterministic OPA policies before final dispatch.
 
 The Critic acts as a hard gate in the System 2 agentic path:
   1. Evaluate proposed action via OPA
-  2. If allowed → approve unchanged
-  3. If denied → rewrite to compliant fallback using local LLM
-  4. If rewrite fails → hard NO_ACTION with denial reason
+  2. If allowed -> approve unchanged
+  3. If denied -> rewrite to compliant fallback using local LLM
+  4. If rewrite fails -> hard NO_ACTION with denial reason
 
 This ensures the LLM Planner cannot bypass business policy constraints
 (e.g., discount limits, restricted items, rate limits).
 """
 
+import asyncio
 from typing import Optional
 
 from loguru import logger
 
 from src.config import settings
 from src.governance.opa_client import OPAClient
+
+CRITIC_LLM_TIMEOUT_SECONDS = 15.0
 
 
 # Lazy-initialized LLM for fallback rewriting
@@ -141,10 +144,13 @@ async def run_critic(
             f"Planner reasoning: {reasoning}"
         )
 
-        response = await llm.invoke([
-            SystemMessage(content=CRITIC_SYSTEM_PROMPT),
-            HumanMessage(content=rewrite_prompt),
-        ])
+        response = await asyncio.wait_for(
+            llm.invoke([
+                SystemMessage(content=CRITIC_SYSTEM_PROMPT),
+                HumanMessage(content=rewrite_prompt),
+            ]),
+            timeout=CRITIC_LLM_TIMEOUT_SECONDS,
+        )
 
         output = response.content if hasattr(response, "content") else str(response)
 

@@ -65,6 +65,7 @@ def _make_evaluator_with_mock_pool(actions: list[dict] | None = None) -> tuple[E
     if actions is not None:
         mock_pool.acquire.return_value.__aenter__.return_value.fetch = AsyncMock(return_value=actions)
     agent._pool = mock_pool
+    agent._read_pool = mock_pool
     return agent, mock_pool
 
 

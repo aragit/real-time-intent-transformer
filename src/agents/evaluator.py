@@ -24,10 +24,15 @@ from loguru import logger
 
 from src.config import settings
 
-
 # Lazy-initialized components
 _llm = None
 _evaluator: Optional["EvaluatorAgent"] = None
+
+# Concurrency semaphore for LLM calls to prevent OOM under burst traffic.
+_llm_semaphore: Optional[asyncio.Semaphore] = None
+
+LLM_TIMEOUT_SECONDS = 30.0
+LLM_MAX_CONCURRENCY = 10
 
 
 METRICS_SCHEMA_SQL = """
@@ -71,6 +76,14 @@ def _get_llm():
             )
         logger.info(f"Evaluator LLM initialized: {settings.llm_provider}/{settings.llm_model}")
     return _llm
+
+
+def _get_llm_semaphore() -> asyncio.Semaphore:
+    """Get or create the shared LLM concurrency semaphore."""
+    global _llm_semaphore
+    if _llm_semaphore is None:
+        _llm_semaphore = asyncio.Semaphore(LLM_MAX_CONCURRENCY)
+    return _llm_semaphore
 
 
 JUDGE_SYSTEM_PROMPT = """You are an e-commerce intervention evaluator.
@@ -142,14 +155,18 @@ class EvaluatorAgent:
 
     Connects to PostgreSQL for reading the action_ledger and writing
     evaluation_metrics. Uses the local event store for outcome correlation.
+
+    Reads route to the configured read-replica (if set) to avoid lock
+    contention with the System 1 hot-path.
     """
 
     def __init__(self, pg_dsn: Optional[str] = None):
         self._dsn = pg_dsn or settings.postgres_dsn
         self._pool: Optional[asyncpg.Pool] = None
+        self._read_pool: Optional[asyncpg.Pool] = None
 
     async def _get_pool(self) -> asyncpg.Pool:
-        """Lazy-initialize the asyncpg connection pool."""
+        """Lazy-initialize the asyncpg connection pool (primary, for writes)."""
         if self._pool is None:
             self._pool = await asyncpg.create_pool(
                 self._dsn,
@@ -157,8 +174,23 @@ class EvaluatorAgent:
                 max_size=3,
             )
             await self._init_metrics_schema()
-            logger.info("EvaluatorAgent pool connected")
+            logger.info("EvaluatorAgent primary pool connected")
         return self._pool
+
+    async def _get_read_pool(self) -> asyncpg.Pool:
+        """Lazy-initialize the read-replica pool (for SELECT queries)."""
+        if self._read_pool is None:
+            replica_dsn = settings.postgres_read_replica_dsn or self._dsn
+            self._read_pool = await asyncpg.create_pool(
+                replica_dsn,
+                min_size=1,
+                max_size=3,
+            )
+            logger.info(
+                f"EvaluatorAgent read pool connected "
+                f"({'replica' if settings.postgres_read_replica_dsn else 'primary'})"
+            )
+        return self._read_pool
 
     async def _init_metrics_schema(self) -> None:
         """Create evaluation_metrics table if it doesn't exist."""
@@ -173,9 +205,10 @@ class EvaluatorAgent:
         """
         Fetch the last batch_size actions from the action_ledger.
 
+        Uses the read-replica pool to avoid lock contention with hot-path writes.
         Returns raw rows as dicts for flexible downstream processing.
         """
-        pool = await self._get_pool()
+        pool = await self._get_read_pool()
         async with pool.acquire() as conn:
             rows = await conn.fetch(
                 """
@@ -271,10 +304,15 @@ class EvaluatorAgent:
             from langchain_core.messages import HumanMessage, SystemMessage
 
             llm = _get_llm()
-            response = await llm.invoke([
-                SystemMessage(content=JUDGE_SYSTEM_PROMPT),
-                HumanMessage(content=user_prompt),
-            ])
+            sem = _get_llm_semaphore()
+            async with sem:
+                response = await asyncio.wait_for(
+                    llm.invoke([
+                        SystemMessage(content=JUDGE_SYSTEM_PROMPT),
+                        HumanMessage(content=user_prompt),
+                    ]),
+                    timeout=LLM_TIMEOUT_SECONDS,
+                )
 
             output = response.content if hasattr(response, "content") else str(response)
 
@@ -449,11 +487,14 @@ class EvaluatorAgent:
         return [dict(r) for r in rows]
 
     async def close(self) -> None:
-        """Close the evaluator's connection pool."""
+        """Close the evaluator's connection pools."""
         global _evaluator
         if self._pool:
             await self._pool.close()
             self._pool = None
+        if self._read_pool:
+            await self._read_pool.close()
+            self._read_pool = None
         _evaluator = None
         logger.info("EvaluatorAgent closed")
 

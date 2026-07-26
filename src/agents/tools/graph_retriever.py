@@ -21,6 +21,9 @@ from src.config import settings
 # Lazy-initialized driver
 _driver = None
 
+# Per-query timeout to prevent complex traversals from hanging the agent.
+NEO4J_QUERY_TIMEOUT = 5.0
+
 
 async def _get_driver():
     """Get or create the async Neo4j driver."""
@@ -82,7 +85,9 @@ async def query_product_graph(
     """
 
     async with driver.session() as session:
-        result = await session.run(cypher, category=category, max_results=max_results)
+        result = await session.run(
+            cypher, category=category, max_results=max_results, timeout=NEO4J_QUERY_TIMEOUT
+        )
         records = [dict(record) async for record in result]
 
     if not records:
@@ -131,7 +136,10 @@ async def get_customer_affinity(
     """
 
     async with driver.session() as session:
-        result = await session.run(cypher, customer_id=customer_id, max_categories=max_categories)
+        result = await session.run(
+            cypher, customer_id=customer_id, max_categories=max_categories,
+            timeout=NEO4J_QUERY_TIMEOUT,
+        )
         records = [dict(record) async for record in result]
 
     if not records:

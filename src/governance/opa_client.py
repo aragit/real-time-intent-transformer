@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional
 
 import httpx
@@ -5,19 +6,29 @@ from loguru import logger
 
 from src.config import settings
 
+# Singleton httpx client with connection pooling
+_http_client: Optional[httpx.AsyncClient] = None
+
+
+async def _get_shared_client() -> httpx.AsyncClient:
+    """Get or create a shared httpx.AsyncClient with connection pooling."""
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(0.05, connect=0.05),
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+        )
+    return _http_client
+
 
 class OPAClient:
     """Async client for Open Policy Agent (OPA) /v1/data evaluation."""
 
     def __init__(self, base_url: Optional[str] = None):
-        self.base_url = base_url or settings.opa_url.replace("/v1/data/ecommerce/allow", "")
+        self.base_url = base_url or settings.opa_url.replace(
+            "/v1/data/ecommerce/allow", ""
+        )
         self.policy_path = "ecommerce/allow"
-        self._client: Optional[httpx.AsyncClient] = None
-
-    async def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None:
-            self._client = httpx.AsyncClient(timeout=5.0)
-        return self._client
 
     async def evaluate(self, action: str, customer: dict, features: dict) -> bool:
         """
@@ -34,7 +45,7 @@ class OPAClient:
         }
 
         try:
-            client = await self._get_client()
+            client = await _get_shared_client()
             response = await client.post(url, json=payload)
             response.raise_for_status()
             result = response.json()
@@ -42,10 +53,16 @@ class OPAClient:
             logger.debug(f"OPA evaluation for {action}: {allowed}")
             return bool(allowed)
         except Exception as e:
-            logger.warning(f"OPA unreachable ({e}). Falling back to Python rules.")
-            return self._python_fallback(action, customer, features)
+            logger.warning(
+                f"OPA unreachable ({e}). Falling back to Python rules."
+            )
+            return await asyncio.to_thread(
+                self._python_fallback, action, customer, features
+            )
 
-    def _python_fallback(self, action: str, customer: dict, features: dict) -> bool:
+    def _python_fallback(
+        self, action: str, customer: dict, features: dict
+    ) -> bool:
         """Mirror of Rego logic for offline/fallback use."""
         if action == "APPLY_DISCOUNT":
             if customer.get("discounts_this_month", 0) >= 3:
@@ -53,6 +70,8 @@ class OPAClient:
             if customer.get("last_discount_within_hours", 999) < 24:
                 return False
             if features.get("total_cart_value", 0) <= 50:
+                return False
+            if customer.get("total_purchases", 0) <= 0:
                 return False
             return True
 
@@ -72,6 +91,7 @@ class OPAClient:
         return False
 
     async def close(self):
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+        global _http_client
+        if _http_client:
+            await _http_client.aclose()
+            _http_client = None

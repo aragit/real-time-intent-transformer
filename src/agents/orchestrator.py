@@ -10,14 +10,21 @@ system based on confidence thresholds and complexity signals.
 
 System 2 includes a Critic Agent that validates the Planner's proposed action
 against deterministic OPA policies before final dispatch.
+
+State persistence is handled via LangGraph checkpointing (PostgresSaver in
+production, MemorySaver fallback for local testing).
 """
 
 from typing import TypedDict, Literal, Optional
 from loguru import logger
 
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
 
 from src.config import settings
+
+# Maximum number of events to carry in state to prevent checkpoint bloat.
+MAX_STATE_EVENTS = 50
 
 
 class OrchestratorState(TypedDict):
@@ -168,6 +175,10 @@ def route_by_complexity(state: OrchestratorState) -> str:
     - Intent is complex (CHURN_RISK, LOYAL_RETURNER)
     - Session shows high exploration ratio (ambiguous behavior)
     """
+    # State bounding: truncate recent_events to prevent checkpoint bloat
+    if len(state.get("recent_events", [])) > MAX_STATE_EVENTS:
+        state["recent_events"] = state["recent_events"][-MAX_STATE_EVENTS:]
+
     confidence = state.get("confidence")
     intent = state.get("intent")
     features = state.get("features", {})
@@ -199,14 +210,19 @@ def route_by_complexity(state: OrchestratorState) -> str:
     return "system_1"
 
 
-def build_orchestrator_graph() -> StateGraph:
+def build_orchestrator_graph():
     """
     Build the LangGraph StateGraph for the orchestrator.
 
     Graph structure:
-        START → route_by_complexity → system_1_fast_path → END
-                                    → system_2_agentic_path → critic_node → END
+        START -> route_by_complexity -> system_1_fast_path -> END
+                                     -> system_2_agentic_path -> critic_node -> END
+
+    Uses PostgresSaver checkpointing when the package is available and a PG DSN
+    is configured; falls back to MemorySaver for local/testing environments.
     """
+    checkpointer = _resolve_checkpointer()
+
     graph = StateGraph(OrchestratorState)
 
     # Add nodes
@@ -230,7 +246,33 @@ def build_orchestrator_graph() -> StateGraph:
     graph.add_edge("system_2_agentic_path", "critic_node")
     graph.add_edge("critic_node", END)
 
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)
+
+
+def _resolve_checkpointer():
+    """Resolve the best available LangGraph checkpointer.
+
+    Production: PostgresSaver (when langgraph-checkpoint-postgres is installed
+    and postgres_dsn is configured).
+    Fallback: MemorySaver (in-memory, no persistence — suitable for local dev).
+    """
+    try:
+        from langgraph.checkpoint.postgres import PostgresSaver
+
+        dsn = settings.postgres_dsn
+        if dsn:
+            logger.info("Using PostgresSaver checkpointer for LangGraph state")
+            return PostgresSaver.from_conn_string(
+                dsn,
+                config={"autocommit": True, "prepare_threshold": 0},
+            )
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.warning(f"PostgresSaver init failed ({e}), falling back to MemorySaver")
+
+    logger.info("Using MemorySaver checkpointer (local/testing mode)")
+    return MemorySaver()
 
 
 # Singleton compiled graph

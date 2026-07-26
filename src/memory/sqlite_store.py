@@ -150,5 +150,15 @@ class SQLiteEventStore(BaseEventStore):
             metadata=json.loads(row.get("metadata", "{}")),
         )
 
+    async def delete_expired_events(self, ttl_hours: int = 24) -> int:
+        """Prune events older than ttl_hours to prevent unbounded table growth."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=ttl_hours)).isoformat()
+        with sqlite3.connect(self.db_path) as conn:
+            cur = conn.execute(
+                "DELETE FROM events WHERE timestamp < ?", (cutoff,)
+            )
+            conn.commit()
+            return cur.rowcount
+
     async def close(self) -> None:
         pass
