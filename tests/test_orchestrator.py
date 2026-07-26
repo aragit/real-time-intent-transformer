@@ -1,13 +1,17 @@
 """
 Orchestrator Routing Logic Tests
-=================================
+================================
 Verifies that the LangGraph orchestrator correctly routes events to
 System 1 (fast path) or System 2 (agentic path) based on confidence
 thresholds, intent complexity, and exploration signals.
+
+Also verifies the full graph execution flow including the Critic Agent.
 """
 
+import json
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch
 
 from src.agents.orchestrator import (
     OrchestratorState,
@@ -33,6 +37,9 @@ def _make_state(
         "features": {"exploration_ratio": exploration_ratio},
         "system": None,
         "result": None,
+        "proposed_action": None,
+        "opa_evaluation": None,
+        "final_action": None,
         **kwargs,
     }
 
@@ -114,3 +121,211 @@ class TestGraphBuild:
         graph = build_orchestrator_graph()
         # Compiled graph should be invocable
         assert hasattr(graph, "invoke") or hasattr(graph, "ainvoke")
+
+
+# ---------------------------------------------------------------------------
+# Full graph execution tests (System 2 → Critic → END)
+# ---------------------------------------------------------------------------
+
+class TestGraphExecution:
+
+    @pytest.mark.asyncio
+    async def test_system_2_flows_through_critic(self):
+        """Verify the full state transition: route → system_2 → critic → END."""
+        mock_planner_result = {
+            "action": "APPLY_DISCOUNT",
+            "confidence": 0.45,
+            "reasoning": "Low confidence session needs intervention",
+            "product_context": "Electronics",
+            "customer_segment": "price_sensitive",
+            "source": "system_2_planner",
+        }
+
+        mock_critic_result = {
+            "action": "FREE_SHIPPING",
+            "reasoning": "Critic rewrite: discount exceeds policy cap",
+            "source": "system_2_critic_rewrite",
+            "opa_allowed": False,
+        }
+
+        with (
+            patch("src.agents.planner.run_planner", new_callable=AsyncMock) as mock_planner,
+            patch("src.agents.critic.run_critic", new_callable=AsyncMock) as mock_critic,
+            patch("src.agents.orchestrator.settings") as mock_settings,
+        ):
+            mock_settings.system_2_confidence_threshold = 0.70
+            mock_planner.return_value = mock_planner_result
+            mock_critic.return_value = mock_critic_result
+
+            graph = build_orchestrator_graph()
+            initial_state = _make_state(
+                confidence=0.45,
+                intent="PRICE_SENSITIVE",
+            )
+
+            final_state = await graph.ainvoke(initial_state)
+
+        # Verify state transitions
+        assert final_state["system"] == "system_2"
+        assert final_state["proposed_action"] == "APPLY_DISCOUNT"
+        assert final_state["opa_evaluation"]["allowed"] is False
+        assert final_state["opa_evaluation"]["proposed_action"] == "APPLY_DISCOUNT"
+        assert final_state["final_action"]["action"] == "FREE_SHIPPING"
+        assert final_state["final_action"]["source"] == "system_2_critic_rewrite"
+        assert final_state["result"]["action"] == "FREE_SHIPPING"
+
+    @pytest.mark.asyncio
+    async def test_system_2_opa_approved_flow(self):
+        """Verify System 2 path when OPA approves the Planner's action."""
+        mock_planner_result = {
+            "action": "SHOW_URGENCY",
+            "confidence": 0.60,
+            "reasoning": "Low stock detected on viewed product",
+            "product_context": "Limited edition sneakers",
+            "customer_segment": "impulse_buyer",
+            "source": "system_2_planner",
+        }
+
+        mock_critic_result = {
+            "action": "SHOW_URGENCY",
+            "reasoning": "Low stock urgency is policy-compliant",
+            "source": "system_2_critic_approved",
+            "opa_allowed": True,
+        }
+
+        with (
+            patch("src.agents.planner.run_planner", new_callable=AsyncMock) as mock_planner,
+            patch("src.agents.critic.run_critic", new_callable=AsyncMock) as mock_critic,
+            patch("src.agents.orchestrator.settings") as mock_settings,
+        ):
+            mock_settings.system_2_confidence_threshold = 0.70
+            mock_planner.return_value = mock_planner_result
+            mock_critic.return_value = mock_critic_result
+
+            graph = build_orchestrator_graph()
+            initial_state = _make_state(
+                confidence=0.55,
+                intent="BROWSE",
+            )
+
+            final_state = await graph.ainvoke(initial_state)
+
+        assert final_state["proposed_action"] == "SHOW_URGENCY"
+        assert final_state["opa_evaluation"]["allowed"] is True
+        assert final_state["final_action"]["action"] == "SHOW_URGENCY"
+        assert final_state["final_action"]["source"] == "system_2_critic_approved"
+
+    @pytest.mark.asyncio
+    async def test_system_2_hard_rejection_flow(self):
+        """Verify System 2 path when both OPA and LLM fail → NO_ACTION."""
+        mock_planner_result = {
+            "action": "OFFER_DISCOUNT",
+            "confidence": 0.40,
+            "reasoning": "Churning customer needs incentive",
+            "product_context": "",
+            "customer_segment": "churning",
+            "source": "system_2_planner",
+        }
+
+        mock_critic_result = {
+            "action": "NO_ACTION",
+            "reasoning": "OPA denied 'OFFER_DISCOUNT': policy violation",
+            "source": "system_2_critic_rejected",
+            "opa_allowed": False,
+        }
+
+        with (
+            patch("src.agents.planner.run_planner", new_callable=AsyncMock) as mock_planner,
+            patch("src.agents.critic.run_critic", new_callable=AsyncMock) as mock_critic,
+            patch("src.agents.orchestrator.settings") as mock_settings,
+        ):
+            mock_settings.system_2_confidence_threshold = 0.70
+            mock_planner.return_value = mock_planner_result
+            mock_critic.return_value = mock_critic_result
+
+            graph = build_orchestrator_graph()
+            initial_state = _make_state(
+                confidence=0.35,
+                intent="CHURN_RISK",
+            )
+
+            final_state = await graph.ainvoke(initial_state)
+
+        assert final_state["proposed_action"] == "OFFER_DISCOUNT"
+        assert final_state["opa_evaluation"]["allowed"] is False
+        assert final_state["final_action"]["action"] == "NO_ACTION"
+        assert final_state["final_action"]["source"] == "system_2_critic_rejected"
+
+    @pytest.mark.asyncio
+    async def test_system_1_bypasses_critic(self):
+        """Verify System 1 path does NOT invoke the Critic Agent."""
+        mock_dispatch = MagicMock()
+        mock_dispatch.action = "SHOW_URGENCY"
+        mock_dispatch.intent = "CHECKOUT_INTENT"
+        mock_dispatch.confidence = 0.92
+        mock_dispatch.reason = "High confidence"
+
+        with (
+            patch("src.pipeline.process_event", new_callable=AsyncMock) as mock_process,
+            patch("src.models.events.ClickEvent") as mock_click,
+            patch("src.agents.critic.run_critic", new_callable=AsyncMock) as mock_critic,
+            patch("src.agents.orchestrator.settings") as mock_settings,
+        ):
+            mock_settings.system_2_confidence_threshold = 0.70
+            mock_process.return_value = mock_dispatch
+
+            graph = build_orchestrator_graph()
+            initial_state = _make_state(confidence=0.92, intent="CHECKOUT_INTENT")
+
+            final_state = await graph.ainvoke(initial_state)
+
+        assert final_state["system"] == "system_1"
+        assert final_state["result"]["source"] == "system_1"
+        mock_critic.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_state_keys_populated_after_system_2(self):
+        """Verify all new state keys are populated after System 2 + Critic."""
+        mock_planner_result = {
+            "action": "NO_ACTION",
+            "confidence": 0.50,
+            "reasoning": "Browsing pattern",
+            "product_context": "",
+            "customer_segment": "unknown",
+            "source": "system_2_planner",
+        }
+
+        mock_critic_result = {
+            "action": "NO_ACTION",
+            "reasoning": "Approved as-is",
+            "source": "system_2_critic_approved",
+            "opa_allowed": True,
+        }
+
+        with (
+            patch("src.agents.planner.run_planner", new_callable=AsyncMock) as mock_planner,
+            patch("src.agents.critic.run_critic", new_callable=AsyncMock) as mock_critic,
+            patch("src.agents.orchestrator.settings") as mock_settings,
+        ):
+            mock_settings.system_2_confidence_threshold = 0.70
+            mock_planner.return_value = mock_planner_result
+            mock_critic.return_value = mock_critic_result
+
+            graph = build_orchestrator_graph()
+            initial_state = _make_state(confidence=0.50)
+
+            final_state = await graph.ainvoke(initial_state)
+
+        # All new keys must be present and non-None
+        assert final_state["proposed_action"] is not None
+        assert final_state["opa_evaluation"] is not None
+        assert final_state["final_action"] is not None
+
+        # Verify structure of opa_evaluation
+        assert "allowed" in final_state["opa_evaluation"]
+        assert "proposed_action" in final_state["opa_evaluation"]
+
+        # Verify structure of final_action
+        assert "action" in final_state["final_action"]
+        assert "source" in final_state["final_action"]
+        assert "reason" in final_state["final_action"]

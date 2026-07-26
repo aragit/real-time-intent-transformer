@@ -3,10 +3,13 @@ Agentic Orchestrator (Phase 2)
 ==============================
 LangGraph StateGraph for dual-path routing:
   - System 1: Fast path (existing pipeline, <50ms)
-  - System 2: Agentic path (LLM + GraphRAG, unlimited latency)
+  - System 2: Agentic path (LLM + GraphRAG + Critic, unlimited latency)
 
 The orchestrator inspects incoming events and routes them to the appropriate
 system based on confidence thresholds and complexity signals.
+
+System 2 includes a Critic Agent that validates the Planner's proposed action
+against deterministic OPA policies before final dispatch.
 """
 
 from typing import TypedDict, Literal, Optional
@@ -28,6 +31,9 @@ class OrchestratorState(TypedDict):
     features: dict
     system: Optional[Literal["system_1", "system_2"]]
     result: Optional[dict]
+    proposed_action: Optional[str]
+    opa_evaluation: Optional[dict]
+    final_action: Optional[dict]
 
 
 async def system_1_fast_path(state: OrchestratorState) -> OrchestratorState:
@@ -64,6 +70,9 @@ async def system_2_agentic_path(state: OrchestratorState) -> OrchestratorState:
     """
     System 2: LLM-powered agentic path with GraphRAG.
     Used for complex intents, ambiguous signals, or multi-step reasoning.
+
+    The Planner Agent proposes an action, which is stored in proposed_action
+    for the Critic Agent to validate against OPA policies.
     """
     from src.agents.planner import run_planner
 
@@ -81,10 +90,72 @@ async def system_2_agentic_path(state: OrchestratorState) -> OrchestratorState:
         features=state.get("features", {}),
     )
 
+    proposed_action = planner_result.get("action", "NO_ACTION")
+    logger.info(
+        f"Planner proposed '{proposed_action}' for session {state['session_id']}"
+    )
+
     return {
         **state,
         "system": "system_2",
         "result": planner_result,
+        "proposed_action": proposed_action,
+    }
+
+
+async def critic_node(state: OrchestratorState) -> OrchestratorState:
+    """
+    Critic Agent: validates the Planner's proposed action against OPA policies.
+
+    - If OPA allows → approve unchanged
+    - If OPA denies → rewrite to compliant fallback via LLM
+    - If rewrite fails → hard NO_ACTION
+
+    System 1 bypasses this node entirely to maintain sub-50ms latency.
+    """
+    from src.agents.critic import run_critic
+
+    proposed = state.get("proposed_action", "NO_ACTION")
+    result = state.get("result", {})
+
+    logger.info(
+        f"Critic evaluating '{proposed}' for session {state['session_id']}"
+    )
+
+    evaluation = await run_critic(
+        proposed_action=proposed,
+        session_id=state["session_id"],
+        customer_id=state.get("customer_id"),
+        confidence=result.get("confidence", 0.0),
+        reasoning=result.get("reasoning", ""),
+        product_context=result.get("product_context", ""),
+        customer_segment=result.get("customer_segment", "unknown"),
+        features=state.get("features", {}),
+    )
+
+    final_result = {
+        "action": evaluation["action"],
+        "intent": result.get("intent", state.get("intent", "UNKNOWN")),
+        "confidence": result.get("confidence", 0.0),
+        "reason": evaluation["reasoning"],
+        "source": evaluation["source"],
+        "original_proposed": proposed,
+    }
+
+    logger.info(
+        f"Critic result for session {state['session_id']}: "
+        f"'{proposed}' → '{evaluation['action']}' "
+        f"(OPA allowed={evaluation['opa_allowed']}, source={evaluation['source']})"
+    )
+
+    return {
+        **state,
+        "opa_evaluation": {
+            "allowed": evaluation["opa_allowed"],
+            "proposed_action": proposed,
+        },
+        "final_action": final_result,
+        "result": final_result,
     }
 
 
@@ -134,13 +205,14 @@ def build_orchestrator_graph() -> StateGraph:
 
     Graph structure:
         START → route_by_complexity → system_1_fast_path → END
-                                    → system_2_agentic_path → END
+                                    → system_2_agentic_path → critic_node → END
     """
     graph = StateGraph(OrchestratorState)
 
     # Add nodes
     graph.add_node("system_1_fast_path", system_1_fast_path)
     graph.add_node("system_2_agentic_path", system_2_agentic_path)
+    graph.add_node("critic_node", critic_node)
 
     # Set entry point with conditional routing
     graph.set_conditional_entry_point(
@@ -151,9 +223,12 @@ def build_orchestrator_graph() -> StateGraph:
         },
     )
 
-    # Both paths lead to END
+    # System 1 bypasses the Critic for sub-50ms latency
     graph.add_edge("system_1_fast_path", END)
-    graph.add_edge("system_2_agentic_path", END)
+
+    # System 2 must pass through the Critic before final dispatch
+    graph.add_edge("system_2_agentic_path", "critic_node")
+    graph.add_edge("critic_node", END)
 
     return graph.compile()
 

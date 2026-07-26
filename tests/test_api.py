@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
 from httpx import AsyncClient, ASGITransport
 from fastapi import status
 
@@ -57,11 +57,19 @@ async def test_intents_distribution_stub():
 
 @pytest.mark.asyncio
 async def test_dispatch_action_minimal():
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.post("/actions/dispatch", params={"session_id": "s_dispatch", "intent": "BROWSE", "confidence": 0.8})
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert data["action"] == "RECOMMEND_ALTERNATIVE"
+    with (
+        patch("src.pipeline._get_classifier") as mock_cls,
+        patch("src.pipeline._run_governance", new_callable=AsyncMock) as mock_gov,
+    ):
+        mock_classifier = MagicMock()
+        mock_classifier.classify.return_value = ("BROWSE", 0.85, "rule_based")
+        mock_cls.return_value = mock_classifier
+        mock_gov.return_value = (True, "")
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post("/actions/dispatch", params={"session_id": "s_dispatch", "intent": "BROWSE", "confidence": 0.8})
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            assert data["action"] == "RECOMMEND_ALTERNATIVE"
 
 @pytest.mark.asyncio
 async def test_get_action_history_empty():
@@ -83,16 +91,12 @@ async def test_ingest_event_accepted():
         "value": None,
         "metadata": {},
     }
-    with patch("src.api.routes.events._get_producer") as mock_get:
-        mock_producer = AsyncMock()
-        mock_get.return_value = mock_producer
+    with patch("src.api.routes.events.ingest_event", new_callable=AsyncMock) as mock_ingest:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post("/events/ingest", json=payload)
             assert response.status_code == status.HTTP_202_ACCEPTED
             assert "event_id" in response.json()
-            mock_producer.start.assert_called_once()
-            mock_producer.send_event.assert_called_once()
-            mock_producer.stop.assert_called_once()
+            mock_ingest.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_ingest_batch_accepted():
@@ -106,13 +110,9 @@ async def test_ingest_batch_accepted():
         }
         for _ in range(5)
     ]
-    with patch("src.api.routes.events._get_producer") as mock_get:
-        mock_producer = AsyncMock()
-        mock_get.return_value = mock_producer
+    with patch("src.api.routes.events.ingest_event", new_callable=AsyncMock) as mock_ingest:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post("/events/ingest/batch", json=payload)
             assert response.status_code == status.HTTP_202_ACCEPTED
             assert response.json()["count"] == 5
-            mock_producer.start.assert_called_once()
-            mock_producer.send_batch.assert_called_once()
-            mock_producer.stop.assert_called_once()
+            assert mock_ingest.call_count == 5
