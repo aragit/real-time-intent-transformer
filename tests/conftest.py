@@ -1,3 +1,6 @@
+import os
+os.environ["LANGFUSE_SDK_DISABLED"] = "true"
+
 import pytest
 from datetime import datetime
 

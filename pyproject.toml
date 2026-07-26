@@ -25,6 +25,8 @@ dependencies = [
     "langgraph>=0.0.20",
     "langchain-core",
     "neo4j>=5.14.0",
+    "langfuse>=2.0.0",
+    "langfuse-langchain>=0.1.0",
 ]
 
 [project.optional-dependencies]

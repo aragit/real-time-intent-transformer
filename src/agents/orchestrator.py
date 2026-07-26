@@ -285,3 +285,28 @@ def get_orchestrator():
     if _graph is None:
         _graph = build_orchestrator_graph()
     return _graph
+
+
+def _get_langfuse_handler():
+    """Create a Langfuse CallbackHandler if credentials are configured."""
+    if settings.langfuse_public_key and settings.langfuse_secret_key:
+        try:
+            from langfuse.callback import CallbackHandler
+            return CallbackHandler(
+                public_key=settings.langfuse_public_key,
+                secret_key=settings.langfuse_secret_key,
+                host=settings.langfuse_host,
+            )
+        except Exception as e:
+            logger.warning(f"Langfuse handler init failed: {e}")
+    return None
+
+
+async def invoke_orchestrator(state: OrchestratorState) -> OrchestratorState:
+    """Invoke the orchestrator graph with optional Langfuse tracing."""
+    graph = get_orchestrator()
+    handler = _get_langfuse_handler()
+    config = {"configurable": {"thread_id": state["session_id"]}}
+    if handler:
+        config["callbacks"] = [handler]
+    return await graph.ainvoke(state, config=config)

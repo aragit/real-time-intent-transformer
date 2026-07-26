@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     llm_base_url: str = "http://localhost:11434/v1"
     llm_api_key: str = "ollama"
     system_2_confidence_threshold: float = 0.70
+    langfuse_public_key: Optional[str] = None
+    langfuse_secret_key: Optional[str] = None
+    langfuse_host: str = "http://localhost:3000"
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from langfuse.decorators import observe
 
 from src.memory import get_event_store
 from src.models.features import SessionFeatures
@@ -23,6 +24,7 @@ async def get_features(session_id: str):
     return _engineer.engineer(events)
 
 
+@observe(as_type="generation")
 @router.get("/sessions/{session_id}/intent", response_model=IntentPrediction)
 async def get_intent(session_id: str):
     """Get current intent prediction + confidence for a session."""

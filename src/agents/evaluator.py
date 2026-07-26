@@ -21,6 +21,7 @@ from typing import Any, Optional
 
 import asyncpg
 from loguru import logger
+from langfuse.decorators import observe
 
 from src.config import settings
 
@@ -270,6 +271,7 @@ class EvaluatorAgent:
 
         return await asyncio.to_thread(_sync_check)
 
+    @observe(as_type="generation")
     async def _run_llm_analysis(
         self, failed_actions: list[dict]
     ) -> dict:
@@ -352,6 +354,7 @@ class EvaluatorAgent:
         drop_pct = (avg - conversion_rate) / avg
         return drop_pct > 0.20
 
+    @observe()
     async def run_evaluation_batch(
         self,
         batch_size: int = 100,

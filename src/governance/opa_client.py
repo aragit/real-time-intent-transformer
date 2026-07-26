@@ -3,6 +3,7 @@ from typing import Optional
 
 import httpx
 from loguru import logger
+from langfuse.decorators import observe
 
 from src.config import settings
 
@@ -30,6 +31,7 @@ class OPAClient:
         )
         self.policy_path = "ecommerce/allow"
 
+    @observe(as_type="generation")
     async def evaluate(self, action: str, customer: dict, features: dict) -> bool:
         """
         Ask OPA if action is allowed.
@@ -60,6 +62,7 @@ class OPAClient:
                 self._python_fallback, action, customer, features
             )
 
+    @observe()
     def _python_fallback(
         self, action: str, customer: dict, features: dict
     ) -> bool:
