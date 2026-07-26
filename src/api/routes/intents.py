@@ -1,20 +1,17 @@
 from fastapi import APIRouter
 
-from src.ingestion.event_store import EventStore
+from src.memory import get_event_store
 from src.perception.feature_engineer import FeatureEngineer
 from src.reasoning.ml_ensemble import MLEnsembleClassifier
 
 router = APIRouter()
-store = EventStore()
-engineer = FeatureEngineer()
-classifier = MLEnsembleClassifier()
+_engineer = FeatureEngineer()
+_classifier = MLEnsembleClassifier()
 
 
 @router.get("/intents/distribution")
 async def get_intent_distribution():
     """Real-time intent class histogram across all sessions."""
-    # Naive implementation: sample recent sessions
-    # Production would use materialized view or streaming aggregation
     distribution = {
         "BROWSE": 0,
         "COMPARE": 0,
@@ -24,5 +21,4 @@ async def get_intent_distribution():
         "CHURN_RISK": 0,
         "LOYAL_RETURNER": 0,
     }
-    # Stub: return empty distribution until we have session indexing
     return {"distribution": distribution, "total_sessions": 0, "note": "Stub: requires session indexing for production"}

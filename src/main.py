@@ -12,6 +12,8 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.app_name}")
     yield
     logger.info(f"Shutting down {settings.app_name}")
+    from src.pipeline import close_pipeline
+    await close_pipeline()
 
 
 app = FastAPI(

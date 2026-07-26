@@ -15,6 +15,18 @@ class Settings(BaseSettings):
     session_timeout_minutes: int = 30
     sliding_window_minutes: int = 5
     model_path: str = "./models/intent_classifier.joblib"
+    use_redis_store: bool = Field(default=False)
+    redis_url: str = "redis://localhost:6379/0"
+    use_pg_ledger: bool = Field(default=False)
+    postgres_dsn: str = "postgresql://postgres:postgres@localhost:5432/intent_transformer"
+    neo4j_uri: str = "bolt://localhost:7687"
+    neo4j_user: str = "neo4j"
+    neo4j_password: str = "password"
+    llm_provider: str = "ollama"
+    llm_model: str = "llama3"
+    llm_base_url: str = "http://localhost:11434/v1"
+    llm_api_key: str = "ollama"
+    system_2_confidence_threshold: float = 0.70
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 
