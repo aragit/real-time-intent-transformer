@@ -16,6 +16,31 @@ from src.models.actions import ActionDispatch
 PG_DSN = "postgresql://postgres:postgres@localhost:5432/intent_transformer"
 
 
+def _pg_reachable(dsn: str = PG_DSN, timeout: float = 2.0) -> bool:
+    """Return True if a live PostgreSQL instance accepts a connection at ``dsn``."""
+
+    async def _probe() -> bool:
+        try:
+            conn = await asyncio.wait_for(asyncpg.connect(dsn), timeout=timeout)
+        except Exception:
+            return False
+        await conn.close()
+        return True
+
+    try:
+        return asyncio.run(_probe())
+    except Exception:
+        return False
+
+
+PG_AVAILABLE = _pg_reachable()
+
+requires_pg = pytest.mark.skipif(
+    not PG_AVAILABLE,
+    reason=f"PostgreSQL not reachable at {PG_DSN} (start it with docker/docker-compose.yml)",
+)
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -132,6 +157,7 @@ def make_rich_dispatch(action_id: str | None = None) -> ActionDispatch:
 # Step 1: Interface & Data Parity
 # ===========================================================================
 
+@requires_pg
 class TestInterfaceParity:
 
     @pytest.mark.asyncio
@@ -214,6 +240,7 @@ class TestInterfaceParity:
 # Step 2: Payload Preservation & Idempotency
 # ===========================================================================
 
+@requires_pg
 class TestPayloadAndIdempotency:
 
     @pytest.mark.asyncio
@@ -288,6 +315,7 @@ class TestPayloadAndIdempotency:
 # Step 3: Concurrent Write & Pool Stress
 # ===========================================================================
 
+@requires_pg
 class TestConcurrentWrites:
 
     @pytest.mark.asyncio
@@ -412,6 +440,7 @@ class TestFactoryAndTeardown:
             await exec_mod.close_ledger()
             assert exec_mod._action_ledger is None
 
+    @requires_pg
     @pytest.mark.asyncio
     async def test_pool_not_left_hanging(self):
         ledger = PGActionLedger(dsn=PG_DSN, min_size=1, max_size=3)

@@ -22,11 +22,15 @@ dependencies = [
     "python-multipart>=0.0.9",
     "redis>=5.0.0",
     "asyncpg>=0.30.0",
-    "langgraph>=0.0.20",
-    "langchain-core",
+    "langchain>=0.3.0,<1.0.0",
+    "langchain-core>=0.3.0,<1.0.0",
+    "langchain-community>=0.3.0,<1.0.0",
+    "langchain-openai>=0.2.0,<1.0.0",
+    "langgraph>=0.2.0,<1.0.0",
+    "langgraph-checkpoint-postgres>=2.0.0",
+    "psycopg[binary,pool]>=3.2.0",
     "neo4j>=5.14.0",
-    "langfuse>=2.0.0",
-    "langfuse-langchain>=0.1.0",
+    "langfuse>=2.0.0,<3.0.0",
 ]
 
 [project.optional-dependencies]
@@ -34,12 +38,14 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
+    "fakeredis>=2.21.0",
     "ruff>=0.3.0",
     "mypy>=1.9.0",
 ]
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["src*"]
 
 [tool.ruff]
 line-length = 100
@@ -54,6 +60,9 @@ testpaths = ["tests"]
 addopts = "--cov=src --cov-report=term-missing --cov-report=html"
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
+# asyncpg, aiokafka, joblib and langfuse ship no type stubs; without this mypy
+# aborts on the imports instead of checking our own code.
+ignore_missing_imports = true
