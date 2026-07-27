@@ -1,4 +1,4 @@
-import asyncio
+from __future__ import annotations
 
 import httpx
 from loguru import logger
@@ -6,86 +6,77 @@ from loguru import logger
 from langfuse.decorators import observe
 from src.config import settings
 
-# Singleton httpx client with connection pooling
 _http_client: httpx.AsyncClient | None = None
+
+HIGH_RISK_ACTIONS = frozenset({"ISSUE_DISCOUNT", "APPLY_DISCOUNT", "REFUND", "CHARGEBACK"})
 
 
 async def _get_shared_client() -> httpx.AsyncClient:
-    """Get or create a shared httpx.AsyncClient with connection pooling."""
     global _http_client
-    if _http_client is None:
+    if _http_client is None or _http_client.is_closed:
         _http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(0.05, connect=0.05),
+            timeout=httpx.Timeout(5.0, connect=2.0),
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
         )
     return _http_client
 
 
 class OPAClient:
-    """Async client for Open Policy Agent (OPA) /v1/data evaluation."""
+    """Async client for Open Policy Agent (OPA) policy evaluation.
 
-    def __init__(self, base_url: str | None = None):
-        self.base_url = base_url or settings.opa_url.replace("/v1/data/ecommerce/allow", "")
-        self.policy_path = "ecommerce/allow"
+    Fail-closed: if OPA is unreachable or times out, high-risk actions are denied.
+    """
+
+    def __init__(self, base_url: str | None = None, policy_package: str = "governance"):
+        self.base_url = (base_url or settings.opa_url).rstrip("/")
+        self.policy_package = policy_package
+        self._eval_url = f"{self.base_url}/v1/data/{policy_package}/allow"
 
     @observe(as_type="generation")
-    async def evaluate(self, action: str, customer: dict, features: dict) -> bool:
-        """
-        Ask OPA if action is allowed.
+    async def evaluate(
+        self,
+        action: str,
+        intent: str = "",
+        discount_value: float = 0.0,
+        customer: dict | None = None,
+        features: dict | None = None,
+    ) -> bool:
+        """Ask OPA if action is allowed.
+
         Returns True if allowed, False otherwise.
+        On connection/timeout errors, defaults to False for high-risk actions (fail-closed).
         """
-        url = f"{self.base_url}/v1/data/{self.policy_path}"
         payload = {
             "input": {
                 "action": action,
-                "customer": customer,
-                "features": features,
+                "intent": intent,
+                "discount_value": discount_value,
+                "customer": customer or {},
+                "features": features or {},
             }
         }
 
         try:
             client = await _get_shared_client()
-            response = await client.post(url, json=payload)
+            response = await client.post(self._eval_url, json=payload)
             response.raise_for_status()
             result = response.json()
-            allowed = result.get("result", False)
-            logger.debug(f"OPA evaluation for {action}: {allowed}")
-            return bool(allowed)
+            allowed = bool(result.get("result", False))
+            logger.debug(f"OPA evaluate({action}): {allowed}")
+            return allowed
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.HTTPStatusError) as e:
+            is_high_risk = action in HIGH_RISK_ACTIONS
+            logger.error(
+                f"OPA unreachable ({type(e).__name__}: {e}). "
+                f"action={action} high_risk={is_high_risk} -> fail-closed"
+            )
+            return False
         except Exception as e:
-            logger.warning(f"OPA unreachable ({e}). Falling back to Python rules.")
-            return await asyncio.to_thread(self._python_fallback, action, customer, features)
-
-    @observe()
-    def _python_fallback(self, action: str, customer: dict, features: dict) -> bool:
-        """Mirror of Rego logic for offline/fallback use."""
-        if action == "APPLY_DISCOUNT":
-            if customer.get("discounts_this_month", 0) >= 3:
-                return False
-            if customer.get("last_discount_within_hours", 999) < 24:
-                return False
-            if features.get("total_cart_value", 0) <= 50:
-                return False
-            if customer.get("total_purchases", 0) <= 0:
-                return False
-            return True
-
-        if action == "SHOW_URGENCY":
-            return (
-                features.get("inventory_level", 100) < 10
-                and features.get("intent") == "CHECKOUT_INTENT"
-            )
-
-        if action == "SEND_ABANDON_EMAIL":
-            return (
-                features.get("session_duration_sec", 0) > 300
-                and features.get("cart_adds", 0) > 0
-                and features.get("checkouts", 0) == 0
-            )
-
-        return False
+            logger.error(f"OPA unexpected error: {e}")
+            return False
 
     async def close(self):
         global _http_client
-        if _http_client:
+        if _http_client and not _http_client.is_closed:
             await _http_client.aclose()
             _http_client = None

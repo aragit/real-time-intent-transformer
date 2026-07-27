@@ -16,7 +16,6 @@ from loguru import logger
 
 from src.execution.dispatcher import ActionDispatcher
 from src.execution.suppressor import ActionSuppressor
-from src.governance.business_rules import BusinessRules
 from src.governance.opa_client import OPAClient
 from src.memory import get_event_store, get_session_store
 from src.models.actions import ActionDispatch
@@ -34,7 +33,6 @@ _engineer: FeatureEngineer | None = None
 _classifier: MLEnsembleClassifier | None = None
 _markov: MarkovIntentModel | None = None
 _opa: OPAClient | None = None
-_rules: BusinessRules | None = None
 
 
 def _get_dispatcher() -> ActionDispatcher:
@@ -79,12 +77,6 @@ def _get_opa() -> OPAClient:
     return _opa
 
 
-def _get_rules() -> BusinessRules:
-    global _rules
-    if _rules is None:
-        _rules = BusinessRules()
-    return _rules
-
 
 async def _hydrate_state(
     session_id: str,
@@ -117,19 +109,17 @@ async def _run_governance(
     action: str,
     customer: dict | None,
     features: SessionFeatures,
+    intent: str = "",
 ) -> tuple[bool, str]:
-    """Evaluate governance via OPA (async HTTP) with Python fallback."""
+    """Evaluate governance via OPA (async HTTP). Fail-closed on errors."""
     opa = _get_opa()
-    customer_dict = customer or {}
-    features_dict = features.model_dump()
-
-    try:
-        allowed = await opa.evaluate(action, customer_dict, features_dict)
-        return allowed, ""
-    except Exception as e:
-        logger.warning(f"OPA evaluation failed: {e}. Using Python rules fallback.")
-        rules = _get_rules()
-        return rules.evaluate(action, customer_dict, features_dict)
+    allowed = await opa.evaluate(
+        action=action,
+        intent=intent,
+        customer=customer or {},
+        features=features.model_dump(),
+    )
+    return allowed, ""
 
 
 async def process_event(event: ClickEvent) -> ActionDispatch:
@@ -173,7 +163,7 @@ async def process_event(event: ClickEvent) -> ActionDispatch:
     action_map = action_dispatch_obj.ACTION_MAP
     proposed_action = action_map.get(intent, "NO_ACTION")
 
-    allowed, reason = await _run_governance(proposed_action, customer, features)
+    allowed, reason = await _run_governance(proposed_action, customer, features, intent=intent)
 
     # Stage 5: Action dispatch with suppression
     suppressor = _get_suppressor()

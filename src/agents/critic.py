@@ -112,7 +112,13 @@ async def run_critic(
 
     # Step 1: Evaluate against OPA
     try:
-        opa_allowed = await opa_client.evaluate(proposed_action, customer, features)
+        opa_allowed = await opa_client.evaluate(
+            action=proposed_action,
+            intent=features.get("intent", ""),
+            discount_value=features.get("discount_value", 0.0),
+            customer=customer,
+            features=features,
+        )
     except Exception as e:
         logger.warning(f"OPA evaluation failed for critic: {e}. Denying action.")
         opa_allowed = False

@@ -134,9 +134,11 @@ class TestCriticApproval:
         )
 
         mock_opa.evaluate.assert_called_once_with(
-            "APPLY_DISCOUNT",
-            customer,
-            features,
+            action="APPLY_DISCOUNT",
+            intent=features.get("intent", ""),
+            discount_value=features.get("discount_value", 0.0),
+            customer=customer,
+            features=features,
         )
 
 

@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     kafka_topic_clicks: str = "ecommerce.clicks.raw"
     kafka_consumer_group: str = "intent-transformer"
     database_url: str = "sqlite:///./intent_transformer.db"
-    opa_url: str = "http://localhost:8181/v1/data/ecommerce/allow"
+    opa_url: str = "http://localhost:8181"
     session_timeout_minutes: int = 30
     sliding_window_minutes: int = 5
     model_path: str = "./models/intent_classifier.joblib"
