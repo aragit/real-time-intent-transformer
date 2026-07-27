@@ -520,6 +520,163 @@ real-time-intent-transformer/
 
 ---
 
+## Troubleshooting
+
+### Issue 1: `asyncio` RuntimeWarning — coroutine was never awaited
+
+**Task:** `fix: async/sync mismatch, eval() vuln, deprecation warnings, SLM enrichment` (`63561bb`)
+
+**Symptom:**
+```
+RuntimeWarning: coroutine 'ChatOllama.ainvoke' was never awaited
+```
+
+**Root Cause:** The Critic agent, Evaluator agent, and Planner agent were calling `llm.invoke()` (synchronous) instead of `llm.ainvoke()` (async). In an async context, this returns a coroutine object instead of the actual result, causing silent failures and `RuntimeWarning`s.
+
+**Fix:** Replaced all `llm.invoke()` calls with `await llm.ainvoke()` across `critic.py`, `evaluator.py`, `planner.py`, `orchestrator.py`, and `graph_retriever.py`. Updated all test mocks from `mock_llm.invoke` → `mock_llm.ainvoke`.
+
+**Prevention:** Always use `ainvoke()` when calling LLMs from async functions. If you see "coroutine was never awaited" warnings, check that all LLM calls in async paths use the async variant.
+
+---
+
+### Issue 2: Arbitrary code execution via `eval()` in event metadata
+
+**Task:** `fix: async/sync mismatch, eval() vuln, deprecation warnings, SLM enrichment` (`63561bb`)
+
+**Symptom:** Security vulnerability — user-supplied metadata was deserialized via `eval(metadata)`, allowing arbitrary Python code execution.
+
+**Root Cause:** `src/ingestion/event_store.py` used `eval()` to parse metadata strings stored in the database.
+
+**Fix:** Replaced `eval(metadata)` with `json.loads(metadata)`. Also replaced `str(metadata)` with `json.dumps(metadata)` for correct JSON serialization when writing to the database.
+
+**Prevention:** Never use `eval()` or `exec()` on user-supplied data. Always use `json.loads()` / `json.dumps()` for structured data. Run `bandit` or similar SAST tools to catch these patterns.
+
+---
+
+### Issue 3: `datetime.utcnow()` deprecation warnings
+
+**Task:** `fix: async/sync mismatch, eval() vuln, deprecation warnings, SLM enrichment` (`63561bb`)
+
+**Symptom:**
+```
+DeprecationWarning: datetime.utcnow() is deprecated
+```
+
+**Root Cause:** Python 3.12+ deprecates `datetime.utcnow()` in favor of `datetime.now(timezone.utc)`.
+
+**Fix:** Replaced all `datetime.utcnow()` calls with `datetime.now(UTC)` across `suppressor.py`, `session_store.py`, and related modules. Added missing `timedelta` import where needed.
+
+---
+
+### Issue 4: Kafka consumer fails to start — `NoBrokersAvailable`
+
+**Task:** `feat: add Kafka ingestion pipeline and streaming simulator` (`d7d56ed`)
+
+**Symptom:**
+```
+kafka.errors.NoNoBrokersAvailable: NoBrokersAvailable
+```
+
+**Root Cause:** The Kafka consumer was hardcoded to `localhost:9092` and couldn't connect when the broker was running in Docker with a different network address.
+
+**Fix:** Updated `kafka_consumer.py` to read `KAFKA_BOOTSTRAP_SERVERS` from environment variable (defaults to `localhost:9092`). Added `__main__.py` for `python -m src.ingestion` execution. Created `simulate_stream.py` for local testing without a full Kafka cluster.
+
+---
+
+### Issue 5: OPA `allow`/`deny` rules silently ignored (Rego v0 → v1)
+
+**Task:** `refactor: governance overhaul` (`aa3d6d2`)
+
+**Symptom:** OPA evaluates all inputs as `allow = false` despite seemingly correct policy rules. No errors in logs.
+
+**Root Cause:** OPA 0.60+ deprecated the `allow { ... }` syntax (v0) in favor of `allow if { ... }` (v1). When OPA loads v0 syntax in newer versions, rules parse without errors but never match — they're silently ignored.
+
+**Fix:** Updated all rules in `policies/ecommerce.rego` from v0 to v1 syntax:
+```rego
+# Before (silently broken)
+allow { input.action == "APPLY_DISCOUNT" ... }
+
+# After (working)
+allow if { input.action == "APPLY_DISCOUNT" ... }
+```
+
+**Prevention:** Pin your OPA version and test policies against the exact version. Run `opa test policies/` after any policy change.
+
+---
+
+### Issue 6: OPA unreachable — actions silently allowed via Python fallback
+
+**Task:** `refactor: governance overhaul` (`aa3d6d2`)
+
+**Symptom:** When OPA is down or unreachable, discount actions are dispatched anyway. No audit trail of the governance bypass.
+
+**Root Cause:** `OPAClient.evaluate()` caught all exceptions and fell back to a Python rules engine (`_python_fallback`). This meant OPA downtime was invisible — actions passed governance checks based on a duplicated rules implementation that could drift from the canonical Rego policies.
+
+**Fix:** Removed the Python fallback entirely. OPA is now the single source of truth. On `ConnectError`, `TimeoutException`, or `HTTPStatusError`, `evaluate()` returns `False` (fail-closed). High-risk actions (`APPLY_DISCOUNT`, `REFUND`, `CHARGEBACK`) are explicitly flagged in error logs.
+
+---
+
+### Issue 7: Docker Compose Kafka fails — Zookeeper dependency removed upstream
+
+**Task:** `refactor: governance overhaul` (`aa3d6d2`)
+
+**Symptom:**
+```
+Error response from daemon: manifest for confluentinc/cp-zookeeper:7.6.0 not found
+```
+or Kafka fails to find Zookeeper and never becomes healthy.
+
+**Root Cause:** The docker-compose.yml used Confluent's Zookeeper + Kafka two-container setup. Newer Confluent images deprecate Zookeeper in favor of KRaft mode.
+
+**Fix:** Replaced the two-container Zookeeper+Kafka setup with a single Apache Kafka container running in KRaft mode (no Zookeeper). OPA container updated to mount the entire `/policies/` directory instead of a single file.
+
+```yaml
+# Before: two services
+services:
+  zookeeper: ...
+  kafka: ... (depends_on: zookeeper)
+
+# After: single service
+services:
+  kafka:
+    image: apache/kafka:latest
+    environment:
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+```
+
+---
+
+### Issue 8: Test `test_opa_evaluation_called_with_correct_args` fails after OPA refactor
+
+**Task:** `refactor: governance overhaul` (`aa3d6d2`)
+
+**Symptom:**
+```
+AssertionError: Expected 'mock' to be called once. Called 0 times.
+```
+
+**Root Cause:** The `OPAClient.evaluate()` signature changed from positional args `(action, customer, features)` to keyword args `(action=, intent=, discount_value=, customer=, features=)`. The test mock assertion still expected the old positional signature.
+
+**Fix:** Updated `tests/test_critic.py` to assert the new keyword argument signature:
+```python
+# Before
+mock_opa.evaluate.assert_called_once_with("APPLY_DISCOUNT", customer, features)
+
+# After
+mock_opa.evaluate.assert_called_once_with(
+    action="APPLY_DISCOUNT",
+    intent=features.get("intent", ""),
+    discount_value=features.get("discount_value", 0.0),
+    customer=customer,
+    features=features,
+)
+```
+
+**Prevention:** When refactoring function signatures, always search the test suite for mock assertions using `grep "assert_called" tests/`.
+
+---
+
 ## Contributing
 
 Contributions welcome in:
