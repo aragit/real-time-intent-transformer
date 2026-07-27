@@ -1,14 +1,13 @@
 import asyncio
-from typing import Optional
 
 import httpx
 from loguru import logger
-from langfuse.decorators import observe
 
+from langfuse.decorators import observe
 from src.config import settings
 
 # Singleton httpx client with connection pooling
-_http_client: Optional[httpx.AsyncClient] = None
+_http_client: httpx.AsyncClient | None = None
 
 
 async def _get_shared_client() -> httpx.AsyncClient:
@@ -25,10 +24,8 @@ async def _get_shared_client() -> httpx.AsyncClient:
 class OPAClient:
     """Async client for Open Policy Agent (OPA) /v1/data evaluation."""
 
-    def __init__(self, base_url: Optional[str] = None):
-        self.base_url = base_url or settings.opa_url.replace(
-            "/v1/data/ecommerce/allow", ""
-        )
+    def __init__(self, base_url: str | None = None):
+        self.base_url = base_url or settings.opa_url.replace("/v1/data/ecommerce/allow", "")
         self.policy_path = "ecommerce/allow"
 
     @observe(as_type="generation")
@@ -55,17 +52,11 @@ class OPAClient:
             logger.debug(f"OPA evaluation for {action}: {allowed}")
             return bool(allowed)
         except Exception as e:
-            logger.warning(
-                f"OPA unreachable ({e}). Falling back to Python rules."
-            )
-            return await asyncio.to_thread(
-                self._python_fallback, action, customer, features
-            )
+            logger.warning(f"OPA unreachable ({e}). Falling back to Python rules.")
+            return await asyncio.to_thread(self._python_fallback, action, customer, features)
 
     @observe()
-    def _python_fallback(
-        self, action: str, customer: dict, features: dict
-    ) -> bool:
+    def _python_fallback(self, action: str, customer: dict, features: dict) -> bool:
         """Mirror of Rego logic for offline/fallback use."""
         if action == "APPLY_DISCOUNT":
             if customer.get("discounts_this_month", 0) >= 3:

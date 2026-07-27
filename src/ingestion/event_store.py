@@ -1,6 +1,6 @@
+import json
 import sqlite3
 from datetime import datetime
-from typing import List, Optional
 
 from loguru import logger
 
@@ -9,7 +9,7 @@ from src.models.events import ClickEvent
 
 
 class EventStore:
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         self.db_path = db_path or settings.database_url.replace("sqlite:///", "")
         self._init_db()
 
@@ -51,12 +51,12 @@ class EventStore:
                     event.product_id,
                     event.category,
                     event.value,
-                    str(event.metadata) if event.metadata else "{}",
+                    json.dumps(event.metadata) if event.metadata else "{}",
                 ),
             )
             conn.commit()
 
-    def get_session_events(self, session_id: str) -> List[ClickEvent]:
+    def get_session_events(self, session_id: str) -> list[ClickEvent]:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
@@ -67,5 +67,5 @@ class EventStore:
 
     def _row_to_event(self, row: dict) -> ClickEvent:
         row["timestamp"] = datetime.fromisoformat(row["timestamp"])
-        row["metadata"] = eval(row["metadata"]) if row["metadata"] else {}
+        row["metadata"] = json.loads(row["metadata"]) if row["metadata"] else {}
         return ClickEvent(**row)

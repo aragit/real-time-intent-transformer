@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import List
 
 from src.models.actions import ActionDispatch
 
@@ -13,7 +12,7 @@ class BaseActionLedger(ABC):
         ...
 
     @abstractmethod
-    async def get_history(self, session_id: str) -> List[ActionDispatch]:
+    async def get_history(self, session_id: str) -> list[ActionDispatch]:
         """Retrieve all dispatched actions for a session, most recent first."""
         ...
 

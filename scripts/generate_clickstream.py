@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 
 import polars as pl
 
-
 INTENT_PROFILES = {
     "BROWSE": {
         "actions": ["page_view"] * 8 + ["search_query"] * 2,
@@ -42,7 +41,10 @@ INTENT_PROFILES = {
         "categories": 1,
     },
     "PRICE_SENSITIVE": {
-        "actions": ["search_query"] * 5 + ["page_view"] * 2 + ["add_to_cart"] * 1 + ["remove_from_cart"] * 2,
+        "actions": ["search_query"] * 5
+        + ["page_view"] * 2
+        + ["add_to_cart"] * 1
+        + ["remove_from_cart"] * 2,
         "cart_adds": 1,
         "checkouts": 0,
         "value_range": (20, 80),
@@ -87,7 +89,9 @@ def generate_session(intent: str, session_id: str, start_time: datetime) -> list
             "action": action,
             "product_id": f"prod_{random.randint(1, 500)}",
             "category": random.choice(categories),
-            "value": value if action in ("add_to_cart", "checkout_start", "purchase_complete") else None,
+            "value": value
+            if action in ("add_to_cart", "checkout_start", "purchase_complete")
+            else None,
             "metadata": json.dumps({}),  # Flattened for CSV
         }
         if action == "search_query":
@@ -100,7 +104,9 @@ def generate_session(intent: str, session_id: str, start_time: datetime) -> list
     return events
 
 
-def generate_dataset(n_sessions: int = 5000, output_path: str = "data/synthetic_clicks.csv") -> None:
+def generate_dataset(
+    n_sessions: int = 5000, output_path: str = "data/synthetic_clicks.csv"
+) -> None:
     random.seed(42)
     all_events = []
     intents = list(INTENT_PROFILES.keys())

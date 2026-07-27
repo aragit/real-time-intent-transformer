@@ -12,9 +12,8 @@ Target: p95 < 50ms (0.05 seconds).
 import asyncio
 import statistics
 import time
-from datetime import datetime, timezone
-from typing import List, Optional, Tuple
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime
+from unittest.mock import patch
 
 import pytest
 
@@ -22,25 +21,25 @@ from src.models.actions import ActionDispatch
 from src.models.events import ClickEvent
 from src.models.features import SessionFeatures
 
-
 # ---------------------------------------------------------------------------
 # Mock stores that simulate realistic I/O latency
 # ---------------------------------------------------------------------------
 
+
 class MockSessionStore:
     """Simulates Redis session store with ~0.5ms async read latency."""
 
-    async def get(self, session_id: str) -> Optional[dict]:
+    async def get(self, session_id: str) -> dict | None:
         await asyncio.sleep(0.0005)  # 0.5ms — realistic for in-memory Redis
         return {
             "session_id": session_id,
             "customer_id": "cust_bench",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "last_activity": datetime.now(timezone.utc).isoformat(),
-            "expires_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
+            "last_activity": datetime.now(UTC).isoformat(),
+            "expires_at": datetime.now(UTC).isoformat(),
         }
 
-    async def upsert(self, session_id: str, customer_id: Optional[str], ttl_hours: int = 24) -> None:
+    async def upsert(self, session_id: str, customer_id: str | None, ttl_hours: int = 24) -> None:
         pass
 
     async def close(self) -> None:
@@ -50,9 +49,9 @@ class MockSessionStore:
 class MockEventStore:
     """Simulates Redis event store with ~0.5ms async read latency."""
 
-    async def get_session_events(self, session_id: str) -> List[ClickEvent]:
+    async def get_session_events(self, session_id: str) -> list[ClickEvent]:
         await asyncio.sleep(0.0005)  # 0.5ms — realistic for in-memory Redis
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return [
             ClickEvent(
                 session_id=session_id,
@@ -87,7 +86,7 @@ class MockLedger:
     async def record(self, dispatch: ActionDispatch) -> None:
         pass
 
-    async def get_history(self, session_id: str) -> List[ActionDispatch]:
+    async def get_history(self, session_id: str) -> list[ActionDispatch]:
         return []
 
     async def close(self) -> None:
@@ -108,7 +107,7 @@ class MockOPAClient:
 class MockClassifier:
     """Simulates ML classification with ~1ms latency (no model loading)."""
 
-    def classify(self, features: SessionFeatures) -> Tuple[str, float, str]:
+    def classify(self, features: SessionFeatures) -> tuple[str, float, str]:
         return "BROWSE", 0.85, "mock"
 
 
@@ -116,8 +115,8 @@ class MockClassifier:
 # Benchmark test
 # ---------------------------------------------------------------------------
 
-class TestLatencyBenchmark:
 
+class TestLatencyBenchmark:
     @pytest.mark.asyncio
     async def test_p95_latency_under_50ms(self):
         """
@@ -129,12 +128,13 @@ class TestLatencyBenchmark:
         mock_opa = MockOPAClient()
         mock_classifier = MockClassifier()
 
-        with patch("src.pipeline.get_session_store", return_value=mock_session), \
-             patch("src.pipeline.get_event_store", return_value=mock_event), \
-             patch("src.pipeline._get_opa", return_value=mock_opa), \
-             patch("src.pipeline._get_classifier", return_value=mock_classifier), \
-             patch("src.execution.get_action_ledger", return_value=mock_ledger):
-
+        with (
+            patch("src.pipeline.get_session_store", return_value=mock_session),
+            patch("src.pipeline.get_event_store", return_value=mock_event),
+            patch("src.pipeline._get_opa", return_value=mock_opa),
+            patch("src.pipeline._get_classifier", return_value=mock_classifier),
+            patch("src.execution.get_action_ledger", return_value=mock_ledger),
+        ):
             from src.pipeline import process_event
 
             # Warm up: initialize singletons (no model loading with mock)
@@ -146,7 +146,7 @@ class TestLatencyBenchmark:
 
             # Benchmark: 10 concurrent events (realistic per-worker async concurrency)
             NUM_EVENTS = 10
-            latencies: List[float] = []
+            latencies: list[float] = []
 
             events = [
                 ClickEvent(
@@ -204,15 +204,16 @@ class TestLatencyBenchmark:
         mock_opa = MockOPAClient()
         mock_classifier = MockClassifier()
 
-        with patch("src.pipeline.get_session_store", return_value=mock_session), \
-             patch("src.pipeline.get_event_store", return_value=mock_event), \
-             patch("src.pipeline._get_opa", return_value=mock_opa), \
-             patch("src.pipeline._get_classifier", return_value=mock_classifier), \
-             patch("src.execution.get_action_ledger", return_value=mock_ledger):
-
+        with (
+            patch("src.pipeline.get_session_store", return_value=mock_session),
+            patch("src.pipeline.get_event_store", return_value=mock_event),
+            patch("src.pipeline._get_opa", return_value=mock_opa),
+            patch("src.pipeline._get_classifier", return_value=mock_classifier),
+            patch("src.execution.get_action_ledger", return_value=mock_ledger),
+        ):
             from src.pipeline import process_event
 
-            latencies: List[float] = []
+            latencies: list[float] = []
             for i in range(50):
                 event = ClickEvent(
                     session_id=f"seq_sess_{i}",

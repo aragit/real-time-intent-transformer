@@ -1,13 +1,10 @@
 import json
-from datetime import datetime, timezone
-from typing import List, Optional
 
 import asyncpg
 from loguru import logger
 
 from src.execution.base import BaseActionLedger
 from src.models.actions import ActionDispatch
-
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS action_ledger (
@@ -40,10 +37,12 @@ def _dispatch_to_row(d: ActionDispatch) -> tuple:
         d.action,
         d.intent,
         d.confidence,
-        json.dumps({
-            "reason": d.reason,
-            "outcome": d.outcome,
-        }),
+        json.dumps(
+            {
+                "reason": d.reason,
+                "outcome": d.outcome,
+            }
+        ),
         "acknowledged" if d.acknowledged else "dispatched",
         d.dispatched_at,
     )
@@ -71,7 +70,7 @@ class PGActionLedger(BaseActionLedger):
         self._dsn = dsn
         self._min_size = min_size
         self._max_size = max_size
-        self._pool: Optional[asyncpg.Pool] = None
+        self._pool: asyncpg.Pool | None = None
 
     async def _get_pool(self) -> asyncpg.Pool:
         if self._pool is None:
@@ -108,7 +107,7 @@ class PGActionLedger(BaseActionLedger):
                 *row,
             )
 
-    async def get_history(self, session_id: str) -> List[ActionDispatch]:
+    async def get_history(self, session_id: str) -> list[ActionDispatch]:
         pool = await self._get_pool()
         async with pool.acquire() as conn:
             rows = await conn.fetch(

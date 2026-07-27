@@ -1,7 +1,4 @@
-from typing import List
-
 import polars as pl
-from loguru import logger
 
 from src.models.events import ClickEvent
 from src.models.features import SessionFeatures
@@ -10,7 +7,7 @@ from src.models.features import SessionFeatures
 class FeatureEngineer:
     """Engineer behavioral features from session events using Polars."""
 
-    def engineer(self, events: List[ClickEvent]) -> SessionFeatures:
+    def engineer(self, events: list[ClickEvent]) -> SessionFeatures:
         if not events:
             return SessionFeatures(session_id="empty")
 

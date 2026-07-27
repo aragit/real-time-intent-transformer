@@ -16,12 +16,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.agents.critic import run_critic, CRITIC_SYSTEM_PROMPT
-
+from src.agents.critic import CRITIC_SYSTEM_PROMPT, run_critic
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
+
 
 def _make_features(**overrides) -> dict:
     base = {
@@ -46,7 +46,7 @@ def _make_mock_llm(output: str) -> MagicMock:
     mock_llm = MagicMock()
     mock_response = MagicMock()
     mock_response.content = output
-    mock_llm.invoke = AsyncMock(return_value=mock_response)
+    mock_llm.ainvoke = AsyncMock(return_value=mock_response)
     return mock_llm
 
 
@@ -54,8 +54,8 @@ def _make_mock_llm(output: str) -> MagicMock:
 # Scenario 1: OPA Approval — action passes through unchanged
 # ---------------------------------------------------------------------------
 
-class TestCriticApproval:
 
+class TestCriticApproval:
     @pytest.mark.asyncio
     async def test_opa_approved_returns_proposed_action(self):
         mock_opa = _make_mock_opa(allowed=True)
@@ -144,15 +144,17 @@ class TestCriticApproval:
 # Scenario 2: OPA Denial + LLM Rewrite → compliant fallback
 # ---------------------------------------------------------------------------
 
-class TestCriticRewrite:
 
+class TestCriticRewrite:
     @pytest.mark.asyncio
     async def test_opa_denied_llm_rewrites_action(self):
         mock_opa = _make_mock_opa(allowed=False)
-        llm_output = json.dumps({
-            "action": "FREE_SHIPPING",
-            "reasoning": "Discount exceeds policy cap; offering free shipping as compliant alternative",
-        })
+        llm_output = json.dumps(
+            {
+                "action": "FREE_SHIPPING",
+                "reasoning": "Discount exceeds policy cap; offering free shipping as compliant alternative",
+            }
+        )
         mock_llm = _make_mock_llm(llm_output)
 
         with patch("src.agents.critic._get_llm", return_value=mock_llm):
@@ -176,10 +178,12 @@ class TestCriticRewrite:
     @pytest.mark.asyncio
     async def test_llm_called_with_correct_prompt_structure(self):
         mock_opa = _make_mock_opa(allowed=False)
-        llm_output = json.dumps({
-            "action": "NO_ACTION",
-            "reasoning": "No compliant alternative available",
-        })
+        llm_output = json.dumps(
+            {
+                "action": "NO_ACTION",
+                "reasoning": "No compliant alternative available",
+            }
+        )
         mock_llm = _make_mock_llm(llm_output)
 
         with patch("src.agents.critic._get_llm", return_value=mock_llm):
@@ -195,8 +199,8 @@ class TestCriticRewrite:
                 opa_client=mock_opa,
             )
 
-        mock_llm.invoke.assert_called_once()
-        call_args = mock_llm.invoke.call_args[0][0]
+        mock_llm.ainvoke.assert_called_once()
+        call_args = mock_llm.ainvoke.call_args[0][0]
         # First message is system prompt, second is human with context
         assert call_args[0].content == CRITIC_SYSTEM_PROMPT
         assert "APPLY_DISCOUNT" in call_args[1].content
@@ -206,10 +210,12 @@ class TestCriticRewrite:
     @pytest.mark.asyncio
     async def test_rewrite_returns_sends_abandon_email(self):
         mock_opa = _make_mock_opa(allowed=False)
-        llm_output = json.dumps({
-            "action": "SEND_ABANDON_EMAIL",
-            "reasoning": "Customer abandoned cart; recovery email is policy-compliant",
-        })
+        llm_output = json.dumps(
+            {
+                "action": "SEND_ABANDON_EMAIL",
+                "reasoning": "Customer abandoned cart; recovery email is policy-compliant",
+            }
+        )
         mock_llm = _make_mock_llm(llm_output)
 
         with patch("src.agents.critic._get_llm", return_value=mock_llm):
@@ -234,10 +240,14 @@ class TestCriticRewrite:
         llm_output = f"""Here's the compliant alternative:
 
 ```json
-{json.dumps({
-    "action": "LOYALTY_REWARD",
-    "reasoning": "Offering loyalty points instead of discount"
-})}
+{
+            json.dumps(
+                {
+                    "action": "LOYALTY_REWARD",
+                    "reasoning": "Offering loyalty points instead of discount",
+                }
+            )
+        }
 ```
 """
         mock_llm = _make_mock_llm(llm_output)
@@ -263,13 +273,13 @@ class TestCriticRewrite:
 # Scenario 3: Hard Rejection — OPA denies + LLM fails → NO_ACTION
 # ---------------------------------------------------------------------------
 
-class TestCriticHardRejection:
 
+class TestCriticHardRejection:
     @pytest.mark.asyncio
     async def test_llm_timeout_returns_no_action(self):
         mock_opa = _make_mock_opa(allowed=False)
         mock_llm = MagicMock()
-        mock_llm.invoke = AsyncMock(side_effect=TimeoutError("LLM request timed out"))
+        mock_llm.ainvoke = AsyncMock(side_effect=TimeoutError("LLM request timed out"))
 
         with patch("src.agents.critic._get_llm", return_value=mock_llm):
             result = await run_critic(
@@ -293,9 +303,7 @@ class TestCriticHardRejection:
     async def test_llm_connection_error_returns_no_action(self):
         mock_opa = _make_mock_opa(allowed=False)
         mock_llm = MagicMock()
-        mock_llm.invoke = AsyncMock(
-            side_effect=ConnectionError("Cannot reach Ollama server")
-        )
+        mock_llm.ainvoke = AsyncMock(side_effect=ConnectionError("Cannot reach Ollama server"))
 
         with patch("src.agents.critic._get_llm", return_value=mock_llm):
             result = await run_critic(
@@ -340,9 +348,7 @@ class TestCriticHardRejection:
     async def test_opa_failure_treated_as_denial(self):
         # OPA client raises an exception (service unreachable)
         mock_opa = MagicMock()
-        mock_opa.evaluate = AsyncMock(
-            side_effect=ConnectionError("OPA service unreachable")
-        )
+        mock_opa.evaluate = AsyncMock(side_effect=ConnectionError("OPA service unreachable"))
 
         result = await run_critic(
             proposed_action="SHOW_URGENCY",
@@ -366,7 +372,7 @@ class TestCriticHardRejection:
     async def test_includes_original_action_in_rejection_reason(self):
         mock_opa = _make_mock_opa(allowed=False)
         mock_llm = MagicMock()
-        mock_llm.invoke = AsyncMock(side_effect=RuntimeError("LLM crashed"))
+        mock_llm.ainvoke = AsyncMock(side_effect=RuntimeError("LLM crashed"))
 
         with patch("src.agents.critic._get_llm", return_value=mock_llm):
             result = await run_critic(
@@ -389,8 +395,8 @@ class TestCriticHardRejection:
 # Unit tests for helper components
 # ---------------------------------------------------------------------------
 
-class TestCriticComponents:
 
+class TestCriticComponents:
     def test_system_prompt_enforces_json_format(self):
         assert "JSON" in CRITIC_SYSTEM_PROMPT
         assert '{"action"' in CRITIC_SYSTEM_PROMPT
@@ -402,8 +408,12 @@ class TestCriticComponents:
 
     def test_system_prompt_lists_compliant_actions(self):
         compliant = [
-            "NO_ACTION", "SHOW_URGENCY", "SEND_ABANDON_EMAIL",
-            "OFFER_BUNDLE", "SEND_TO_HUMAN", "LOYALTY_REWARD",
+            "NO_ACTION",
+            "SHOW_URGENCY",
+            "SEND_ABANDON_EMAIL",
+            "OFFER_BUNDLE",
+            "SEND_TO_HUMAN",
+            "LOYALTY_REWARD",
             "RECOMMEND_ALTERNATIVE",
         ]
         for action in compliant:

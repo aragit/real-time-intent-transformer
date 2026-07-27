@@ -12,24 +12,23 @@ Verifies that:
 """
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.agents.planner import (
-    build_planner_input,
-    run_planner,
     PLANNER_SYSTEM_PROMPT,
     PLANNER_TOOLS,
+    build_planner_input,
+    run_planner,
 )
-
 
 # ---------------------------------------------------------------------------
 # build_planner_input tests
 # ---------------------------------------------------------------------------
 
-class TestBuildPlannerInput:
 
+class TestBuildPlannerInput:
     def test_formats_session_data(self):
         result = build_planner_input(
             session_id="sess_001",
@@ -37,8 +36,18 @@ class TestBuildPlannerInput:
             intent="BROWSE",
             confidence=0.65,
             recent_events=[
-                {"action": "page_view", "product_id": "prod_1", "category": "electronics", "value": 99.99},
-                {"action": "add_to_cart", "product_id": "prod_2", "category": "electronics", "value": 149.99},
+                {
+                    "action": "page_view",
+                    "product_id": "prod_1",
+                    "category": "electronics",
+                    "value": 99.99,
+                },
+                {
+                    "action": "add_to_cart",
+                    "product_id": "prod_2",
+                    "category": "electronics",
+                    "value": 149.99,
+                },
             ],
             features={
                 "session_duration_sec": 120,
@@ -76,7 +85,12 @@ class TestBuildPlannerInput:
 
     def test_limits_events_to_10(self):
         events = [
-            {"action": f"action_{i}", "product_id": f"prod_{i}", "category": "misc", "value": float(i)}
+            {
+                "action": f"action_{i}",
+                "product_id": f"prod_{i}",
+                "category": "misc",
+                "value": float(i),
+            }
             for i in range(20)
         ]
         result = build_planner_input(
@@ -97,8 +111,8 @@ class TestBuildPlannerInput:
 # Planner tool list tests
 # ---------------------------------------------------------------------------
 
-class TestPlannerTools:
 
+class TestPlannerTools:
     def test_has_two_tools(self):
         assert len(PLANNER_TOOLS) == 2
 
@@ -112,11 +126,17 @@ class TestPlannerTools:
 # System prompt tests
 # ---------------------------------------------------------------------------
 
-class TestSystemPrompt:
 
+class TestSystemPrompt:
     def test_contains_action_options(self):
-        actions = ["OFFER_BUNDLE", "SEND_ABANDON_EMAIL", "OFFER_DISCOUNT",
-                    "SEND_TO_HUMAN", "NO_ACTION", "SHOW_URGENCY"]
+        actions = [
+            "OFFER_BUNDLE",
+            "SEND_ABANDON_EMAIL",
+            "OFFER_DISCOUNT",
+            "SEND_TO_HUMAN",
+            "NO_ACTION",
+            "SHOW_URGENCY",
+        ]
         for action in actions:
             assert action in PLANNER_SYSTEM_PROMPT
 
@@ -131,17 +151,19 @@ class TestSystemPrompt:
 # run_planner tests (mocked LLM)
 # ---------------------------------------------------------------------------
 
-class TestRunPlanner:
 
+class TestRunPlanner:
     @pytest.mark.asyncio
     async def test_successful_json_parse(self):
-        mock_output = json.dumps({
-            "action": "OFFER_BUNDLE",
-            "confidence": 0.85,
-            "reasoning": "Customer showing high cart interest with category switching",
-            "product_context": "MacBook Pro, USB-C Hub",
-            "customer_segment": "tech_enthusiast",
-        })
+        mock_output = json.dumps(
+            {
+                "action": "OFFER_BUNDLE",
+                "confidence": 0.85,
+                "reasoning": "Customer showing high cart interest with category switching",
+                "product_context": "MacBook Pro, USB-C Hub",
+                "customer_segment": "tech_enthusiast",
+            }
+        )
 
         mock_executor = MagicMock()
         mock_executor.invoke.return_value = {"output": mock_output}
@@ -166,13 +188,17 @@ class TestRunPlanner:
         mock_output = f"""Here's my analysis:
 
 ```json
-{json.dumps({
-    "action": "SHOW_URGENCY",
-    "confidence": 0.72,
-    "reasoning": "Low stock detected",
-    "product_context": "Limited edition item",
-    "customer_segment": "impulse_buyer"
-})}
+{
+            json.dumps(
+                {
+                    "action": "SHOW_URGENCY",
+                    "confidence": 0.72,
+                    "reasoning": "Low stock detected",
+                    "product_context": "Limited edition item",
+                    "customer_segment": "impulse_buyer",
+                }
+            )
+        }
 ```
 
 I recommend creating urgency."""

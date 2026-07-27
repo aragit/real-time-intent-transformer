@@ -1,5 +1,3 @@
-from typing import Tuple
-
 from src.models.features import SessionFeatures
 
 
@@ -16,7 +14,7 @@ class RuleBasedClassifier:
         "LOYAL_RETURNER",
     ]
 
-    def classify(self, features: SessionFeatures) -> Tuple[str, float]:
+    def classify(self, features: SessionFeatures) -> tuple[str, float]:
         scores = {intent: 0 for intent in self.INTENT_CLASSES}
 
         # BROWSE: high page views, low cart activity, high exploration

@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
+
 from pydantic import BaseModel, Field
 
 
 class SessionFeatures(BaseModel):
     session_id: str
-    customer_id: Optional[str] = None
+    customer_id: str | None = None
     session_duration_sec: float = 0.0
     total_actions: int = 0
     page_views: int = 0
@@ -24,7 +24,7 @@ class SessionFeatures(BaseModel):
     exploration_ratio: float = 0.0
     cart_value_per_minute: float = 0.0
     avg_inter_event_time: float = 0.0
-    action_sequence: List[str] = Field(default_factory=list)
+    action_sequence: list[str] = Field(default_factory=list)
     repeat_customer: bool = False
-    days_since_last_purchase: Optional[int] = None
-    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    days_since_last_purchase: int | None = None
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

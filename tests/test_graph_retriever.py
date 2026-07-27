@@ -11,19 +11,20 @@ Verifies that:
 """
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from src.agents.tools.graph_retriever import query_product_graph, get_customer_affinity
-
+from src.agents.tools.graph_retriever import get_customer_affinity, query_product_graph
 
 # ---------------------------------------------------------------------------
 # Mock helpers
 # ---------------------------------------------------------------------------
 
+
 class MockRecord:
     """Simulates a Neo4j record."""
+
     def __init__(self, data: dict):
         self._data = data
 
@@ -36,6 +37,7 @@ class MockRecord:
 
 class MockAsyncIterator:
     """Async iterator for mock Neo4j results."""
+
     def __init__(self, items):
         self._items = items
         self._index = 0
@@ -53,6 +55,7 @@ class MockAsyncIterator:
 
 class MockResult:
     """Simulates a Neo4j async result."""
+
     def __init__(self, records: list[dict]):
         self._records = [MockRecord(r) for r in records]
 
@@ -62,6 +65,7 @@ class MockResult:
 
 class MockSession:
     """Simulates a Neo4j async session."""
+
     def __init__(self, records: list[dict]):
         self._records = records
 
@@ -77,6 +81,7 @@ class MockSession:
 
 class MockDriver:
     """Simulates a Neo4j async driver."""
+
     def __init__(self, records: list[dict]):
         self._records = records
 
@@ -91,8 +96,8 @@ class MockDriver:
 # query_product_graph tests
 # ---------------------------------------------------------------------------
 
-class TestQueryProductGraph:
 
+class TestQueryProductGraph:
     @pytest.mark.asyncio
     async def test_returns_formatted_json(self):
         mock_records = [
@@ -137,11 +142,22 @@ class TestQueryProductGraph:
 
     @pytest.mark.asyncio
     async def test_respects_max_results_parameter(self):
-        mock_records = [{"product_name": f"Product {i}", "price": i * 10, "popularity": i, "complementary": [], "similar": []} for i in range(10)]
+        mock_records = [
+            {
+                "product_name": f"Product {i}",
+                "price": i * 10,
+                "popularity": i,
+                "complementary": [],
+                "similar": [],
+            }
+            for i in range(10)
+        ]
         mock_driver = MockDriver(mock_records)
 
         with patch("src.agents.tools.graph_retriever._get_driver", return_value=mock_driver):
-            result = await query_product_graph.ainvoke({"category": "electronics", "max_results": 3})
+            result = await query_product_graph.ainvoke(
+                {"category": "electronics", "max_results": 3}
+            )
 
         parsed = json.loads(result)
         assert parsed["total_found"] == 10
@@ -177,8 +193,8 @@ class TestQueryProductGraph:
 # get_customer_affinity tests
 # ---------------------------------------------------------------------------
 
-class TestGetCustomerAffinity:
 
+class TestGetCustomerAffinity:
     @pytest.mark.asyncio
     async def test_returns_formatted_json(self):
         mock_records = [

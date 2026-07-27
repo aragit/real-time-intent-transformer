@@ -25,8 +25,10 @@ dependencies = [
     "langgraph>=0.0.20",
     "langchain-core",
     "neo4j>=5.14.0",
-    "langfuse>=2.0.0",
+    "langfuse>=2.0.0,<3.0.0",
     "langfuse-langchain>=0.1.0",
+    "langchain",
+    "langchain-openai"
 ]
 
 [project.optional-dependencies]
@@ -36,6 +38,7 @@ dev = [
     "pytest-cov>=4.1.0",
     "ruff>=0.3.0",
     "mypy>=1.9.0",
+    "fakeredis"
 ]
 
 [tool.setuptools.packages.find]

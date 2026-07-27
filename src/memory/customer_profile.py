@@ -1,18 +1,16 @@
 import sqlite3
 from datetime import datetime
-from typing import List, Optional
 
 from loguru import logger
 
 from src.config import settings
 from src.models.customer import CustomerProfile
-from src.models.intent import IntentPrediction
 
 
 class CustomerProfileStore:
     """Aggregated customer behavior storage."""
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         self.db_path = db_path or settings.database_url.replace("sqlite:///", "")
         self._init_db()
 
@@ -59,7 +57,7 @@ class CustomerProfileStore:
             )
             conn.commit()
 
-    def get(self, customer_id: str) -> Optional[CustomerProfile]:
+    def get(self, customer_id: str) -> CustomerProfile | None:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
@@ -68,7 +66,9 @@ class CustomerProfileStore:
             if not row:
                 return None
             data = dict(row)
-            data["preferred_categories"] = data["preferred_categories"].split(",") if data["preferred_categories"] else []
+            data["preferred_categories"] = (
+                data["preferred_categories"].split(",") if data["preferred_categories"] else []
+            )
             data["intent_history"] = []  # Loaded separately if needed
             data["last_updated"] = datetime.fromisoformat(data["last_updated"])
             return CustomerProfile(**data)

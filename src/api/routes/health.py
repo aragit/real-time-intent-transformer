@@ -1,6 +1,7 @@
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, status
 from pydantic import BaseModel
-from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -15,6 +16,6 @@ class HealthResponse(BaseModel):
 async def health_check():
     return HealthResponse(
         status="healthy",
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         version="0.1.0",
     )

@@ -18,6 +18,7 @@ async def lifespan(app: FastAPI):
     # Start the evaluator background worker
     try:
         from src.workers.evaluator_worker import start_evaluator_loop
+
         _evaluator_task = asyncio.create_task(
             start_evaluator_loop(interval_seconds=300, batch_size=100)
         )
@@ -40,11 +41,13 @@ async def lifespan(app: FastAPI):
     # Clean up evaluator resources
     try:
         from src.workers.evaluator_worker import stop_evaluator_worker
+
         await stop_evaluator_worker()
     except Exception as e:
         logger.warning(f"Error stopping evaluator worker: {e}")
 
     from src.pipeline import close_pipeline
+
     await close_pipeline()
 
 

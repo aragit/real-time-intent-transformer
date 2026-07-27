@@ -15,7 +15,6 @@ This ensures the LLM Planner cannot bypass business policy constraints
 """
 
 import asyncio
-from typing import Optional
 
 from loguru import logger
 
@@ -34,13 +33,19 @@ def _get_llm():
     global _llm
     if _llm is None:
         if settings.llm_provider == "ollama":
-            from langchain_community.chat_models import ChatOllama
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=DeprecationWarning)
+                from langchain_community.chat_models import ChatOllama
+
             _llm = ChatOllama(
                 model=settings.llm_model,
                 base_url=settings.llm_base_url.replace("/v1", ""),
             )
         else:
             from langchain_openai import ChatOpenAI
+
             _llm = ChatOpenAI(
                 model=settings.llm_model,
                 base_url=settings.llm_base_url,
@@ -75,13 +80,13 @@ Your job is to rewrite a non-compliant action into a policy-compliant alternativ
 async def run_critic(
     proposed_action: str,
     session_id: str,
-    customer_id: Optional[str],
+    customer_id: str | None,
     confidence: float,
     reasoning: str,
     product_context: str,
     customer_segment: str,
     features: dict,
-    opa_client: Optional[OPAClient] = None,
+    opa_client: OPAClient | None = None,
 ) -> dict:
     """
     Evaluate a proposed action against OPA policies and rewrite if necessary.
@@ -101,7 +106,7 @@ async def run_critic(
         Dict with keys: action, reasoning, source, opa_allowed.
     """
     if opa_client is None:
-        opa_client = OPAlient()
+        opa_client = OPAClient()
 
     customer = {"customer_id": customer_id} if customer_id else {}
 
@@ -113,10 +118,7 @@ async def run_critic(
         opa_allowed = False
 
     if opa_allowed:
-        logger.info(
-            f"Critic approved '{proposed_action}' for session {session_id} "
-            f"(OPA allowed)"
-        )
+        logger.info(f"Critic approved '{proposed_action}' for session {session_id} (OPA allowed)")
         return {
             "action": proposed_action,
             "reasoning": reasoning,
@@ -145,10 +147,12 @@ async def run_critic(
         )
 
         response = await asyncio.wait_for(
-            llm.invoke([
-                SystemMessage(content=CRITIC_SYSTEM_PROMPT),
-                HumanMessage(content=rewrite_prompt),
-            ]),
+            llm.ainvoke(
+                [
+                    SystemMessage(content=CRITIC_SYSTEM_PROMPT),
+                    HumanMessage(content=rewrite_prompt),
+                ]
+            ),
             timeout=CRITIC_LLM_TIMEOUT_SECONDS,
         )
 
@@ -156,6 +160,7 @@ async def run_critic(
 
         # Parse JSON from LLM output
         import json
+
         json_start = output.find("{")
         json_end = output.rfind("}") + 1
         if json_start >= 0 and json_end > json_start:
@@ -164,8 +169,7 @@ async def run_critic(
             fallback_reasoning = parsed.get("reasoning", "Critic rewrite")
 
             logger.info(
-                f"Critic rewrote '{proposed_action}' → '{fallback_action}' "
-                f"for session {session_id}"
+                f"Critic rewrote '{proposed_action}' → '{fallback_action}' for session {session_id}"
             )
             return {
                 "action": fallback_action,
@@ -179,8 +183,7 @@ async def run_critic(
 
     # Step 3: LLM rewrite failed — hard NO_ACTION
     logger.warning(
-        f"Critic defaulting to NO_ACTION for session {session_id} "
-        f"(denied: {proposed_action})"
+        f"Critic defaulting to NO_ACTION for session {session_id} (denied: {proposed_action})"
     )
     return {
         "action": "NO_ACTION",

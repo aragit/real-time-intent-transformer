@@ -11,7 +11,6 @@ CPU-bound ML inference is offloaded to thread pool via asyncio.to_thread.
 """
 
 import asyncio
-from typing import Dict, Optional, Tuple
 
 from loguru import logger
 
@@ -24,17 +23,18 @@ from src.models.actions import ActionDispatch
 from src.models.events import ClickEvent
 from src.models.features import SessionFeatures
 from src.perception.feature_engineer import FeatureEngineer
-from src.reasoning.ml_ensemble import MLEnsembleClassifier
 from src.reasoning.markov_model import MarkovIntentModel
+from src.reasoning.ml_ensemble import MLEnsembleClassifier
+from src.reasoning.slm_enrichment import get_slm_enrichment
 
 # Singleton instances — lazily initialized
-_dispatcher: Optional[ActionDispatcher] = None
-_suppressor: Optional[ActionSuppressor] = None
-_engineer: Optional[FeatureEngineer] = None
-_classifier: Optional[MLEnsembleClassifier] = None
-_markov: Optional[MarkovIntentModel] = None
-_opa: Optional[OPAClient] = None
-_rules: Optional[BusinessRules] = None
+_dispatcher: ActionDispatcher | None = None
+_suppressor: ActionSuppressor | None = None
+_engineer: FeatureEngineer | None = None
+_classifier: MLEnsembleClassifier | None = None
+_markov: MarkovIntentModel | None = None
+_opa: OPAClient | None = None
+_rules: BusinessRules | None = None
 
 
 def _get_dispatcher() -> ActionDispatcher:
@@ -88,7 +88,7 @@ def _get_rules() -> BusinessRules:
 
 async def _hydrate_state(
     session_id: str,
-) -> Tuple[Optional[dict], list[ClickEvent], Optional[dict]]:
+) -> tuple[dict | None, list[ClickEvent], dict | None]:
     """Hydrate session state, events, and customer profile in parallel."""
     session_store = get_session_store()
     event_store = get_event_store()
@@ -106,7 +106,7 @@ async def _hydrate_state(
     return session, events, customer
 
 
-async def _run_classification(features: SessionFeatures) -> Tuple[str, float, str]:
+async def _run_classification(features: SessionFeatures) -> tuple[str, float, str]:
     """Run ML ensemble classification offloaded to thread pool (CPU-bound)."""
     classifier = _get_classifier()
     loop = asyncio.get_running_loop()
@@ -115,9 +115,9 @@ async def _run_classification(features: SessionFeatures) -> Tuple[str, float, st
 
 async def _run_governance(
     action: str,
-    customer: Optional[dict],
+    customer: dict | None,
     features: SessionFeatures,
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """Evaluate governance via OPA (async HTTP) with Python fallback."""
     opa = _get_opa()
     customer_dict = customer or {}
@@ -155,8 +155,18 @@ async def process_event(event: ClickEvent) -> ActionDispatch:
     engineer = _get_engineer()
     features = engineer.engineer(events)
 
-    # Stage 3: ML classification (offloaded to thread pool)
-    intent, confidence, method = await _run_classification(features)
+    # Stage 3: ML classification + optional SLM enrichment in parallel
+    slm = get_slm_enrichment()
+    ml_task = _run_classification(features)
+    slm_task = slm.enrich_intent(features.model_dump()) if slm.available else asyncio.sleep(0, result=None)
+    intent, confidence, method = await ml_task
+    slm_result = await slm_task
+
+    # If SLM enrichment is available and ML confidence is low, prefer SLM
+    if slm_result and slm_result["confidence"] > confidence:
+        intent = slm_result["intent"]
+        confidence = slm_result["confidence"]
+        method = "slm_enrichment"
 
     # Stage 4: Governance evaluation (async OPA)
     action_dispatch_obj = _get_dispatcher()
@@ -196,6 +206,7 @@ async def process_event(event: ClickEvent) -> ActionDispatch:
     # Stage 6: Log to ledger (non-blocking, fire-and-forget with error handling)
     try:
         from src.execution import get_action_ledger
+
         ledger = get_action_ledger()
         await ledger.record(dispatch)
     except Exception as e:
@@ -228,10 +239,12 @@ async def close_pipeline() -> None:
     global _opa
     from src.execution import close_ledger
     from src.memory import close_stores
+    from src.reasoning.slm_enrichment import close_slm
 
     await asyncio.gather(
         close_stores(),
         close_ledger(),
+        close_slm(),
         _opa.close() if _opa else asyncio.sleep(0),
         return_exceptions=True,
     )

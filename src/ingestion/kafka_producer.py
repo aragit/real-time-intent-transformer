@@ -1,5 +1,4 @@
 import json
-from typing import List, Optional
 
 from aiokafka import AIOKafkaProducer
 from loguru import logger
@@ -9,9 +8,9 @@ from src.models.events import ClickEvent
 
 
 class ClickstreamProducer:
-    def __init__(self, bootstrap_servers: Optional[str] = None):
+    def __init__(self, bootstrap_servers: str | None = None):
         self.bootstrap_servers = bootstrap_servers or settings.kafka_bootstrap_servers
-        self._producer: Optional[AIOKafkaProducer] = None
+        self._producer: AIOKafkaProducer | None = None
 
     async def start(self):
         self._producer = AIOKafkaProducer(
@@ -35,7 +34,7 @@ class ClickstreamProducer:
         )
         logger.debug(f"Sent event {event.event_id} to {settings.kafka_topic_clicks}")
 
-    async def send_batch(self, events: List[ClickEvent]) -> None:
+    async def send_batch(self, events: list[ClickEvent]) -> None:
         for event in events:
             await self.send_event(event)
         logger.info(f"Sent batch of {len(events)} events")

@@ -1,7 +1,7 @@
 import asyncio
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import asyncpg
@@ -9,8 +9,8 @@ import pytest
 import pytest_asyncio
 
 from src.execution.base import BaseActionLedger
-from src.execution.sqlite_ledger import SQLiteActionLedger
 from src.execution.pg_ledger import PGActionLedger
+from src.execution.sqlite_ledger import SQLiteActionLedger
 from src.models.actions import ActionDispatch
 
 PG_DSN = "postgresql://postgres:postgres@localhost:5432/intent_transformer"
@@ -19,6 +19,7 @@ PG_DSN = "postgresql://postgres:postgres@localhost:5432/intent_transformer"
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def sqlite_ledger(tmp_path):
@@ -45,7 +46,7 @@ async def pg_ledger_isolated(tmp_path):
     pool = await asyncpg.create_pool(PG_DSN, min_size=1, max_size=5)
     async with pool.acquire() as conn:
         await conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
-        await conn.execute(f"SET search_path TO \"{schema}\", public")
+        await conn.execute(f'SET search_path TO "{schema}", public')
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS action_ledger (
                 id          BIGSERIAL PRIMARY KEY,
@@ -59,7 +60,9 @@ async def pg_ledger_isolated(tmp_path):
                 created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
         """)
-        await conn.execute(f'CREATE INDEX IF NOT EXISTS idx_ledger_session ON action_ledger (session_id, created_at DESC)')
+        await conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ledger_session ON action_ledger (session_id, created_at DESC)"
+        )
     await pool.close()
 
     ledger = PGActionLedger.__new__(PGActionLedger)
@@ -75,10 +78,11 @@ async def pg_ledger_isolated(tmp_path):
     async def patched_create_pool(dsn, **kwargs):
         p = await original_create_pool(dsn, **kwargs)
         async with p.acquire() as conn:
-            await conn.execute(f"SET search_path TO \"{schema}\", public")
+            await conn.execute(f'SET search_path TO "{schema}", public')
         return p
 
     import src.execution.pg_ledger as pg_mod
+
     original_factory = pg_mod.asyncpg.create_pool
     pg_mod.asyncpg.create_pool = patched_create_pool
 
@@ -108,7 +112,7 @@ def make_dispatch(
         confidence=0.87,
         action=action,
         reason=reason,
-        dispatched_at=dispatched_at or datetime.now(timezone.utc),
+        dispatched_at=dispatched_at or datetime.now(UTC),
         acknowledged=False,
         outcome=outcome,
     )
@@ -122,7 +126,7 @@ def make_rich_dispatch(action_id: str | None = None) -> ActionDispatch:
         confidence=0.93,
         action="RECOMMEND_ALTERNATIVE",
         reason="ML model scored cross-sell probability 0.93; OPA rule eval: allow",
-        dispatched_at=datetime(2024, 7, 2, 8, 30, 0, tzinfo=timezone.utc),
+        dispatched_at=datetime(2024, 7, 2, 8, 30, 0, tzinfo=UTC),
         acknowledged=True,
         outcome="clicked",
     )
@@ -132,8 +136,8 @@ def make_rich_dispatch(action_id: str | None = None) -> ActionDispatch:
 # Step 1: Interface & Data Parity
 # ===========================================================================
 
-class TestInterfaceParity:
 
+class TestInterfaceParity:
     @pytest.mark.asyncio
     async def test_record_and_get_history_parity(self, sqlite_ledger, pg_ledger_isolated):
         sid = _uniq("sess_parity")
@@ -180,7 +184,7 @@ class TestInterfaceParity:
     @pytest.mark.asyncio
     async def test_history_ordering_desc(self, sqlite_ledger, pg_ledger_isolated):
         sid = _uniq("sess_ord")
-        base = datetime(2024, 7, 1, 12, 0, 0, tzinfo=timezone.utc)
+        base = datetime(2024, 7, 1, 12, 0, 0, tzinfo=UTC)
         for i in range(3):
             d = make_dispatch(
                 action_id=f"ord_{uuid.uuid4().hex[:6]}",
@@ -214,8 +218,8 @@ class TestInterfaceParity:
 # Step 2: Payload Preservation & Idempotency
 # ===========================================================================
 
-class TestPayloadAndIdempotency:
 
+class TestPayloadAndIdempotency:
     @pytest.mark.asyncio
     async def test_jsonb_nested_payload_preserved(self, pg_ledger_isolated):
         dispatch = make_rich_dispatch(action_id=f"rich_{uuid.uuid4().hex[:6]}")
@@ -238,12 +242,14 @@ class TestPayloadAndIdempotency:
             intent="upsell",
             confidence=0.77,
             action="LOYALTY_REWARD",
-            reason=json.dumps({
-                "ml": {"model": "v3", "scores": [0.91, 0.87, 0.93]},
-                "opa": {"policy": "loyalty.allow", "eval": True},
-                "context": {"page": "/cart", "ab_test": "B"},
-            }),
-            dispatched_at=datetime(2024, 7, 3, tzinfo=timezone.utc),
+            reason=json.dumps(
+                {
+                    "ml": {"model": "v3", "scores": [0.91, 0.87, 0.93]},
+                    "opa": {"policy": "loyalty.allow", "eval": True},
+                    "context": {"page": "/cart", "ab_test": "B"},
+                }
+            ),
+            dispatched_at=datetime(2024, 7, 3, tzinfo=UTC),
         )
         await pg_ledger_isolated.record(dispatch)
 
@@ -288,8 +294,8 @@ class TestPayloadAndIdempotency:
 # Step 3: Concurrent Write & Pool Stress
 # ===========================================================================
 
-class TestConcurrentWrites:
 
+class TestConcurrentWrites:
     @pytest.mark.asyncio
     async def test_50_concurrent_writes(self):
         ledger = PGActionLedger(dsn=PG_DSN, min_size=5, max_size=10)
@@ -332,19 +338,23 @@ class TestConcurrentWrites:
 
             sid = _uniq("sess_mixed")
             for i in range(20):
-                await ledger.record(make_dispatch(
-                    action_id=f"mixed_{i:03d}",
-                    session_id=sid,
-                ))
+                await ledger.record(
+                    make_dispatch(
+                        action_id=f"mixed_{i:03d}",
+                        session_id=sid,
+                    )
+                )
 
             async def read_all():
                 return await ledger.get_history(sid)
 
             async def write_one(idx):
-                await ledger.record(make_dispatch(
-                    action_id=f"mixed_w_{idx:03d}",
-                    session_id=sid,
-                ))
+                await ledger.record(
+                    make_dispatch(
+                        action_id=f"mixed_w_{idx:03d}",
+                        session_id=sid,
+                    )
+                )
 
             tasks = [read_all()] + [write_one(i) for i in range(10)]
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -362,8 +372,8 @@ class TestConcurrentWrites:
 # Step 4: Factory & Teardown Verification
 # ===========================================================================
 
-class TestFactoryAndTeardown:
 
+class TestFactoryAndTeardown:
     @pytest.mark.asyncio
     async def test_factory_pg_toggle(self):
         import src.execution as exec_mod
@@ -371,8 +381,10 @@ class TestFactoryAndTeardown:
 
         exec_mod._action_ledger = None
 
-        with patch.object(settings, "use_pg_ledger", True), \
-             patch.object(settings, "postgres_dsn", PG_DSN):
+        with (
+            patch.object(settings, "use_pg_ledger", True),
+            patch.object(settings, "postgres_dsn", PG_DSN),
+        ):
             ledger = exec_mod.get_action_ledger()
             assert isinstance(ledger, PGActionLedger)
             await ledger.close()
@@ -385,8 +397,10 @@ class TestFactoryAndTeardown:
 
         exec_mod._action_ledger = None
 
-        with patch.object(settings, "use_pg_ledger", False), \
-             patch.object(settings, "database_url", "sqlite:///./test_ledger_factory.db"):
+        with (
+            patch.object(settings, "use_pg_ledger", False),
+            patch.object(settings, "database_url", "sqlite:///./test_ledger_factory.db"),
+        ):
             ledger = exec_mod.get_action_ledger()
             assert isinstance(ledger, SQLiteActionLedger)
             await ledger.close()
@@ -395,6 +409,7 @@ class TestFactoryAndTeardown:
     @pytest.mark.asyncio
     async def test_close_ledger_noop_when_none(self):
         import src.execution as exec_mod
+
         exec_mod._action_ledger = None
         await exec_mod.close_ledger()
 
@@ -405,8 +420,10 @@ class TestFactoryAndTeardown:
 
         exec_mod._action_ledger = None
 
-        with patch.object(settings, "use_pg_ledger", True), \
-             patch.object(settings, "postgres_dsn", PG_DSN):
+        with (
+            patch.object(settings, "use_pg_ledger", True),
+            patch.object(settings, "postgres_dsn", PG_DSN),
+        ):
             ledger = exec_mod.get_action_ledger()
             exec_mod._action_ledger = ledger
             await exec_mod.close_ledger()

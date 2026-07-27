@@ -1,11 +1,10 @@
 import json
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from datetime import UTC, datetime, timedelta
 
-from loguru import logger
 import redis.asyncio as aioredis
+from loguru import logger
 
-from src.memory.base import BaseSessionStore, BaseEventStore
+from src.memory.base import BaseEventStore, BaseSessionStore
 from src.models.events import ClickEvent
 
 
@@ -14,7 +13,7 @@ class RedisSessionStore(BaseSessionStore):
 
     def __init__(self, redis_url: str = "redis://localhost:6379/0"):
         self._redis_url = redis_url
-        self._client: Optional[aioredis.Redis] = None
+        self._client: aioredis.Redis | None = None
 
     async def _get_client(self) -> aioredis.Redis:
         if self._client is None:
@@ -26,9 +25,9 @@ class RedisSessionStore(BaseSessionStore):
             logger.info("RedisSessionStore connected")
         return self._client
 
-    async def upsert(self, session_id: str, customer_id: Optional[str], ttl_hours: int = 24) -> None:
+    async def upsert(self, session_id: str, customer_id: str | None, ttl_hours: int = 24) -> None:
         client = await self._get_client()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         session_data = {
             "session_id": session_id,
             "customer_id": customer_id,
@@ -40,14 +39,14 @@ class RedisSessionStore(BaseSessionStore):
         ttl_seconds = ttl_hours * 3600
         await client.setex(key, ttl_seconds, json.dumps(session_data))
 
-    async def get(self, session_id: str) -> Optional[dict]:
+    async def get(self, session_id: str) -> dict | None:
         client = await self._get_client()
         key = f"session:{session_id}"
         data = await client.get(key)
         if data is None:
             return None
         session = json.loads(data)
-        if datetime.fromisoformat(session["expires_at"]) < datetime.now(timezone.utc):
+        if datetime.fromisoformat(session["expires_at"]) < datetime.now(UTC):
             await client.delete(key)
             return None
         return session
@@ -59,7 +58,7 @@ class RedisSessionStore(BaseSessionStore):
             data = await client.get(key)
             if data:
                 session = json.loads(data)
-                if datetime.fromisoformat(session["expires_at"]) < datetime.now(timezone.utc):
+                if datetime.fromisoformat(session["expires_at"]) < datetime.now(UTC):
                     await client.delete(key)
                     count += 1
         return count
@@ -77,7 +76,7 @@ class RedisEventStore(BaseEventStore):
 
     def __init__(self, redis_url: str = "redis://localhost:6379/0"):
         self._redis_url = redis_url
-        self._client: Optional[aioredis.Redis] = None
+        self._client: aioredis.Redis | None = None
 
     async def _get_client(self) -> aioredis.Redis:
         if self._client is None:
@@ -106,24 +105,26 @@ class RedisEventStore(BaseEventStore):
         await client.lpush(key, json.dumps(event_data))
         await client.ltrim(key, 0, self.MAX_EVENTS_PER_SESSION - 1)
 
-    async def get_session_events(self, session_id: str) -> List[ClickEvent]:
+    async def get_session_events(self, session_id: str) -> list[ClickEvent]:
         client = await self._get_client()
         key = f"events:{session_id}"
         raw_events = await client.lrange(key, 0, -1)
         events = []
         for raw in reversed(raw_events):
             data = json.loads(raw)
-            events.append(ClickEvent(
-                event_id=data["event_id"],
-                session_id=data["session_id"],
-                customer_id=data.get("customer_id"),
-                timestamp=datetime.fromisoformat(data["timestamp"]),
-                action=data["action"],
-                product_id=data.get("product_id"),
-                category=data.get("category"),
-                value=data.get("value"),
-                metadata=json.loads(data.get("metadata", "{}")),
-            ))
+            events.append(
+                ClickEvent(
+                    event_id=data["event_id"],
+                    session_id=data["session_id"],
+                    customer_id=data.get("customer_id"),
+                    timestamp=datetime.fromisoformat(data["timestamp"]),
+                    action=data["action"],
+                    product_id=data.get("product_id"),
+                    category=data.get("category"),
+                    value=data.get("value"),
+                    metadata=json.loads(data.get("metadata", "{}")),
+                )
+            )
         return events
 
     async def close(self) -> None:

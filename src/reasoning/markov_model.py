@@ -1,5 +1,3 @@
-from typing import Dict, List, Optional
-
 import numpy as np
 
 
@@ -9,7 +7,7 @@ class MarkovIntentModel:
     States: LANDING → BROWSING → COMPARING → CARTING → CHECKOUT → PURCHASE → EXIT
     """
 
-    TRANSITION_MATRIX: Dict[str, Dict[str, float]] = {
+    TRANSITION_MATRIX: dict[str, dict[str, float]] = {
         "LANDING": {"BROWSING": 0.7, "EXIT": 0.3},
         "BROWSING": {"BROWSING": 0.5, "COMPARING": 0.2, "CARTING": 0.1, "EXIT": 0.2},
         "COMPARING": {"COMPARING": 0.4, "CARTING": 0.3, "BROWSING": 0.2, "EXIT": 0.1},
@@ -27,14 +25,14 @@ class MarkovIntentModel:
         "purchase_complete": "PURCHASE",
     }
 
-    def infer_current_state(self, action_history: List[str]) -> str:
+    def infer_current_state(self, action_history: list[str]) -> str:
         """Infer most likely current state from action history."""
         if not action_history:
             return "LANDING"
         last_action = action_history[-1]
         return self.ACTION_TO_STATE.get(last_action, "BROWSING")
 
-    def predict_next_state(self, current_state: str, action_history: List[str]) -> str:
+    def predict_next_state(self, current_state: str, action_history: list[str]) -> str:
         """Predict most likely next state with action-weighted adjustments."""
         if current_state not in self.TRANSITION_MATRIX:
             return "EXIT"
@@ -59,7 +57,7 @@ class MarkovIntentModel:
 
         return max(adjusted, key=adjusted.get)
 
-    def get_chain_prediction(self, action_history: List[str]) -> tuple[str, str]:
+    def get_chain_prediction(self, action_history: list[str]) -> tuple[str, str]:
         """Return (current_state, predicted_next_state)."""
         current = self.infer_current_state(action_history)
         next_state = self.predict_next_state(current, action_history)

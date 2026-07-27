@@ -1,6 +1,5 @@
 import sqlite3
 from datetime import datetime
-from typing import List, Optional
 
 from loguru import logger
 
@@ -60,7 +59,7 @@ class SQLiteActionLedger(BaseActionLedger):
             )
             conn.commit()
 
-    async def get_history(self, session_id: str) -> List[ActionDispatch]:
+    async def get_history(self, session_id: str) -> list[ActionDispatch]:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(

@@ -1,6 +1,6 @@
 import hashlib
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -21,10 +21,10 @@ class ActionDispatch(BaseModel):
     intent: str
     confidence: float
     action: str
-    reason: Optional[str] = None
-    dispatched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    reason: str | None = None
+    dispatched_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     acknowledged: bool = False
-    outcome: Optional[str] = None
+    outcome: str | None = None
 
     def model_post_init(self, __context) -> None:
         if not self.action_id:

@@ -1,11 +1,10 @@
-import sqlite3
 import json
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+import sqlite3
+from datetime import UTC, datetime, timedelta
 
 from loguru import logger
 
-from src.memory.base import BaseSessionStore, BaseEventStore
+from src.memory.base import BaseEventStore, BaseSessionStore
 from src.models.events import ClickEvent
 
 
@@ -30,8 +29,8 @@ class SQLiteSessionStore(BaseSessionStore):
             conn.commit()
         logger.info("SQLiteSessionStore initialized")
 
-    async def upsert(self, session_id: str, customer_id: Optional[str], ttl_hours: int = 24) -> None:
-        now = datetime.now(timezone.utc)
+    async def upsert(self, session_id: str, customer_id: str | None, ttl_hours: int = 24) -> None:
+        now = datetime.now(UTC)
         expires = now + timedelta(hours=ttl_hours)
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
@@ -46,7 +45,7 @@ class SQLiteSessionStore(BaseSessionStore):
             )
             conn.commit()
 
-    async def get(self, session_id: str) -> Optional[dict]:
+    async def get(self, session_id: str) -> dict | None:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
@@ -55,7 +54,7 @@ class SQLiteSessionStore(BaseSessionStore):
             if not row:
                 return None
             session = dict(row)
-            if datetime.fromisoformat(session["expires_at"]) < datetime.now(timezone.utc):
+            if datetime.fromisoformat(session["expires_at"]) < datetime.now(UTC):
                 await self._delete(session_id)
                 return None
             return session
@@ -69,7 +68,7 @@ class SQLiteSessionStore(BaseSessionStore):
         with sqlite3.connect(self.db_path) as conn:
             cur = conn.execute(
                 "DELETE FROM sessions WHERE expires_at < ?",
-                (datetime.now(timezone.utc).isoformat(),),
+                (datetime.now(UTC).isoformat(),),
             )
             conn.commit()
             return cur.rowcount
@@ -128,7 +127,7 @@ class SQLiteEventStore(BaseEventStore):
             )
             conn.commit()
 
-    async def get_session_events(self, session_id: str) -> List[ClickEvent]:
+    async def get_session_events(self, session_id: str) -> list[ClickEvent]:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
@@ -152,11 +151,9 @@ class SQLiteEventStore(BaseEventStore):
 
     async def delete_expired_events(self, ttl_hours: int = 24) -> int:
         """Prune events older than ttl_hours to prevent unbounded table growth."""
-        cutoff = (datetime.now(timezone.utc) - timedelta(hours=ttl_hours)).isoformat()
+        cutoff = (datetime.now(UTC) - timedelta(hours=ttl_hours)).isoformat()
         with sqlite3.connect(self.db_path) as conn:
-            cur = conn.execute(
-                "DELETE FROM events WHERE timestamp < ?", (cutoff,)
-            )
+            cur = conn.execute("DELETE FROM events WHERE timestamp < ?", (cutoff,))
             conn.commit()
             return cur.rowcount
 

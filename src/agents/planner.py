@@ -11,14 +11,13 @@ indicating the ML ensemble cannot confidently classify the intent.
 """
 
 import json
-from typing import Any, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import BaseTool
 from loguru import logger
 
-from src.agents.tools.graph_retriever import query_product_graph, get_customer_affinity
+from src.agents.tools.graph_retriever import get_customer_affinity, query_product_graph
 from src.config import settings
 
 # Lazy-initialized LLM
@@ -60,11 +59,13 @@ Always respond with a JSON object:
 }
 """
 
-PLANNER_PROMPT = ChatPromptTemplate.from_messages([
-    SystemMessage(content=PLANNER_SYSTEM_PROMPT),
-    MessagesPlaceholder(variable_name="chat_history"),
-    HumanMessage(content="{input}"),
-])
+PLANNER_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        SystemMessage(content=PLANNER_SYSTEM_PROMPT),
+        MessagesPlaceholder(variable_name="chat_history"),
+        HumanMessage(content="{input}"),
+    ]
+)
 
 # Tools available to the planner
 PLANNER_TOOLS: list[BaseTool] = [query_product_graph, get_customer_affinity]
@@ -75,13 +76,19 @@ def _get_llm():
     global _llm
     if _llm is None:
         if settings.llm_provider == "ollama":
-            from langchain_community.chat_models import ChatOllama
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=DeprecationWarning)
+                from langchain_community.chat_models import ChatOllama
+
             _llm = ChatOllama(
                 model=settings.llm_model,
                 base_url=settings.llm_base_url.replace("/v1", ""),
             )
         else:
             from langchain_openai import ChatOpenAI
+
             _llm = ChatOpenAI(
                 model=settings.llm_model,
                 base_url=settings.llm_base_url,
@@ -97,7 +104,7 @@ def _get_planner():
     """Get or create the agent executor."""
     global _planner
     if _planner is None:
-        from langchain.agents import create_tool_calling_agent, AgentExecutor
+        from langchain.agents import AgentExecutor, create_tool_calling_agent
 
         llm = _get_llm()
         agent = create_tool_calling_agent(llm, PLANNER_TOOLS, PLANNER_PROMPT)
@@ -114,7 +121,7 @@ def _get_planner():
 
 def build_planner_input(
     session_id: str,
-    customer_id: Optional[str],
+    customer_id: str | None,
     intent: str,
     confidence: float,
     recent_events: list[dict],
@@ -143,20 +150,20 @@ def build_planner_input(
     return f"""Analyze this e-commerce session and recommend an intervention:
 
 Session: {session_id}
-Customer: {customer_id or 'anonymous'}
+Customer: {customer_id or "anonymous"}
 ML Intent: {intent} (confidence: {confidence:.2f})
 
 Recent Events:
-{events_summary if events_summary else '  No recent events'}
+{events_summary if events_summary else "  No recent events"}
 
 Session Features:
-- Duration: {features.get('session_duration_sec', 0):.0f}s
-- Total actions: {features.get('total_actions', 0)}
-- Cart value: ${features.get('total_cart_value', 0):.2f}
-- Cart adds: {features.get('cart_adds', 0)}
-- Checkouts: {features.get('checkouts', 0)}
-- Category switches: {features.get('category_switches', 0)}
-- Exploration ratio: {features.get('exploration_ratio', 0):.2f}
+- Duration: {features.get("session_duration_sec", 0):.0f}s
+- Total actions: {features.get("total_actions", 0)}
+- Cart value: ${features.get("total_cart_value", 0):.2f}
+- Cart adds: {features.get("cart_adds", 0)}
+- Checkouts: {features.get("checkouts", 0)}
+- Category switches: {features.get("category_switches", 0)}
+- Exploration ratio: {features.get("exploration_ratio", 0):.2f}
 
 Please:
 1. Use query_product_graph to find products in the session's categories
@@ -166,7 +173,7 @@ Please:
 
 async def run_planner(
     session_id: str,
-    customer_id: Optional[str],
+    customer_id: str | None,
     intent: str,
     confidence: float,
     recent_events: list[dict],
@@ -194,6 +201,7 @@ async def run_planner(
         planner = _get_planner()
         # Run in thread pool since AgentExecutor is sync
         import asyncio
+
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             None,
@@ -258,6 +266,7 @@ async def close_planner():
     """Clean up planner resources."""
     global _llm, _planner
     from src.agents.tools.graph_retriever import close_driver
+
     await close_driver()
     _llm = None
     _planner = None

@@ -1,7 +1,5 @@
-import asyncio
 import json
-import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import fakeredis.aioredis
@@ -9,14 +7,14 @@ import pytest
 import pytest_asyncio
 
 from src.memory.base import BaseEventStore, BaseSessionStore
-from src.memory.sqlite_store import SQLiteEventStore, SQLiteSessionStore
 from src.memory.redis_store import RedisEventStore, RedisSessionStore
+from src.memory.sqlite_store import SQLiteEventStore, SQLiteSessionStore
 from src.models.events import ClickEvent
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def sqlite_session_store(tmp_path):
@@ -69,7 +67,7 @@ def sample_event():
     return ClickEvent(
         session_id="sess_test_001",
         customer_id="cust_001",
-        timestamp=datetime(2024, 6, 15, 10, 30, 0, tzinfo=timezone.utc),
+        timestamp=datetime(2024, 6, 15, 10, 30, 0, tzinfo=UTC),
         action="page_view",
         product_id="prod_100",
         category="electronics",
@@ -82,7 +80,7 @@ def make_event(index: int, session_id: str = "sess_bulk") -> ClickEvent:
     return ClickEvent(
         session_id=session_id,
         customer_id="cust_bulk",
-        timestamp=datetime(2024, 6, 15, 10, 0, 0, tzinfo=timezone.utc) + timedelta(seconds=index),
+        timestamp=datetime(2024, 6, 15, 10, 0, 0, tzinfo=UTC) + timedelta(seconds=index),
         action="page_view",
         product_id=f"prod_{index}",
         category="misc",
@@ -95,11 +93,14 @@ def make_event(index: int, session_id: str = "sess_bulk") -> ClickEvent:
 # Step 1: Interface & Data Parity Tests
 # ===========================================================================
 
+
 class TestInterfaceParity:
     """Both backends must produce identical dict structures for sessions."""
 
     @pytest.mark.asyncio
-    async def test_upsert_get_parity(self, sqlite_session_store, redis_session_store, sample_session):
+    async def test_upsert_get_parity(
+        self, sqlite_session_store, redis_session_store, sample_session
+    ):
         sid = sample_session["session_id"]
         cid = sample_session["customer_id"]
         ttl = sample_session["ttl_hours"]
@@ -132,7 +133,9 @@ class TestInterfaceParity:
         assert await redis_session_store.get("nonexistent") is None
 
     @pytest.mark.asyncio
-    async def test_event_insert_get_parity(self, sqlite_event_store, redis_event_store, sample_event):
+    async def test_event_insert_get_parity(
+        self, sqlite_event_store, redis_event_store, sample_event
+    ):
         await sqlite_event_store.insert(sample_event)
         await redis_event_store.insert(sample_event)
 
@@ -159,8 +162,8 @@ class TestInterfaceParity:
 # Step 2: Boundary & TTL Enforcement
 # ===========================================================================
 
-class TestBoundaryBehavior:
 
+class TestBoundaryBehavior:
     @pytest.mark.asyncio
     async def test_bounded_event_stream_ltrim(self, redis_event_store):
         """Push 120 events; only the latest 100 should survive LTRIM."""
@@ -187,13 +190,18 @@ class TestBoundaryBehavior:
     async def test_session_expires_returns_none(self, redis_session_store, redis_client):
         """Manually expire a key; get() must return None."""
         await redis_session_store.upsert("sess_expire", "cust_e", ttl_hours=1)
-        await redis_client.set("session:sess_expire", json.dumps({
-            "session_id": "sess_expire",
-            "customer_id": "cust_e",
-            "created_at": "2024-01-01T00:00:00+00:00",
-            "last_activity": "2024-01-01T00:00:00+00:00",
-            "expires_at": "2020-01-01T00:00:00+00:00",  # already expired
-        }))
+        await redis_client.set(
+            "session:sess_expire",
+            json.dumps(
+                {
+                    "session_id": "sess_expire",
+                    "customer_id": "cust_e",
+                    "created_at": "2024-01-01T00:00:00+00:00",
+                    "last_activity": "2024-01-01T00:00:00+00:00",
+                    "expires_at": "2020-01-01T00:00:00+00:00",  # already expired
+                }
+            ),
+        )
         result = await redis_session_store.get("sess_expire")
         assert result is None
 
@@ -221,8 +229,8 @@ class TestBoundaryBehavior:
 # Step 3: Factory & Teardown Verification
 # ===========================================================================
 
-class TestFactoryAndTeardown:
 
+class TestFactoryAndTeardown:
     @pytest.mark.asyncio
     async def test_factory_redis_toggle(self):
         import src.memory as mem_mod
@@ -231,8 +239,10 @@ class TestFactoryAndTeardown:
         mem_mod._session_store = None
         mem_mod._event_store = None
 
-        with patch.object(settings, "use_redis_store", True), \
-             patch.object(settings, "redis_url", "redis://localhost:6379/0"):
+        with (
+            patch.object(settings, "use_redis_store", True),
+            patch.object(settings, "redis_url", "redis://localhost:6379/0"),
+        ):
             store = mem_mod.get_session_store()
             assert isinstance(store, RedisSessionStore)
             await store.close()
@@ -246,8 +256,10 @@ class TestFactoryAndTeardown:
         mem_mod._session_store = None
         mem_mod._event_store = None
 
-        with patch.object(settings, "use_redis_store", False), \
-             patch.object(settings, "database_url", "sqlite:///./test_factory.db"):
+        with (
+            patch.object(settings, "use_redis_store", False),
+            patch.object(settings, "database_url", "sqlite:///./test_factory.db"),
+        ):
             store = mem_mod.get_session_store()
             assert isinstance(store, SQLiteSessionStore)
             await store.close()

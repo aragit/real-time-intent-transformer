@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
 
 from loguru import logger
 
@@ -10,12 +9,12 @@ from src.models.events import ClickEvent
 class SessionWindow:
     """Manages sliding windows and session timeouts."""
 
-    def __init__(self, timeout_minutes: Optional[int] = None):
+    def __init__(self, timeout_minutes: int | None = None):
         self.timeout_minutes = timeout_minutes or settings.session_timeout_minutes
-        self._sessions: Dict[str, List[ClickEvent]] = {}
-        self._last_seen: Dict[str, datetime] = {}
+        self._sessions: dict[str, list[ClickEvent]] = {}
+        self._last_seen: dict[str, datetime] = {}
 
-    def add_event(self, event: ClickEvent) -> List[ClickEvent]:
+    def add_event(self, event: ClickEvent) -> list[ClickEvent]:
         """Add event to session. Returns expired session events if timeout triggered."""
         expired = []
         session_id = event.session_id
@@ -40,7 +39,7 @@ class SessionWindow:
 
         return expired
 
-    def get_session(self, session_id: str) -> List[ClickEvent]:
+    def get_session(self, session_id: str) -> list[ClickEvent]:
         return self._sessions.get(session_id, [])
 
     def clear_session(self, session_id: str) -> None:

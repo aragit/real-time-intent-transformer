@@ -1,10 +1,9 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
+import pytest
 
-from src.ingestion.kafka_producer import ClickstreamProducer
 from src.ingestion.kafka_consumer import ClickstreamConsumer
+from src.ingestion.kafka_producer import ClickstreamProducer
 from src.models.events import ClickEvent
 
 
@@ -65,19 +64,19 @@ class TestKafkaConsumer:
     async def test_consume_callback(self, sample_event):
         consumer = ClickstreamConsumer(bootstrap_servers="localhost:9092")
         callback = AsyncMock()
-        
+
         # Create proper async iterator mock
         mock_msg = MagicMock()
         mock_msg.value = sample_event.model_dump()
-        
+
         async def mock_async_iter():
             yield mock_msg
-        
+
         with patch("src.ingestion.kafka_consumer.AIOKafkaConsumer") as mock_cls:
             mock_instance = AsyncMock()
             mock_instance.__aiter__ = mock_async_iter
             mock_cls.return_value = mock_instance
-            
+
             await consumer.start()
             # Manually test the callback logic
             event = ClickEvent(**mock_msg.value)

@@ -12,7 +12,9 @@ class TestFeatureEngineer:
 
     def test_single_page_view(self):
         engineer = FeatureEngineer()
-        events = [ClickEvent(session_id="s1", action="page_view", timestamp=datetime(2024, 1, 1, 12, 0))]
+        events = [
+            ClickEvent(session_id="s1", action="page_view", timestamp=datetime(2024, 1, 1, 12, 0))
+        ]
         features = engineer.engineer(events)
         assert features.page_views == 1
         assert features.cart_adds == 0
@@ -22,8 +24,18 @@ class TestFeatureEngineer:
         engineer = FeatureEngineer()
         events = [
             ClickEvent(session_id="s1", action="page_view", timestamp=datetime(2024, 1, 1, 12, 0)),
-            ClickEvent(session_id="s1", action="add_to_cart", value=50, timestamp=datetime(2024, 1, 1, 12, 1)),
-            ClickEvent(session_id="s1", action="remove_from_cart", value=50, timestamp=datetime(2024, 1, 1, 12, 2)),
+            ClickEvent(
+                session_id="s1",
+                action="add_to_cart",
+                value=50,
+                timestamp=datetime(2024, 1, 1, 12, 1),
+            ),
+            ClickEvent(
+                session_id="s1",
+                action="remove_from_cart",
+                value=50,
+                timestamp=datetime(2024, 1, 1, 12, 2),
+            ),
         ]
         features = engineer.engineer(events)
         assert features.cart_adds == 1
@@ -44,9 +56,24 @@ class TestFeatureEngineer:
     def test_category_switching(self):
         engineer = FeatureEngineer()
         events = [
-            ClickEvent(session_id="s1", action="page_view", category="A", timestamp=datetime(2024, 1, 1, 12, 0)),
-            ClickEvent(session_id="s1", action="page_view", category="B", timestamp=datetime(2024, 1, 1, 12, 1)),
-            ClickEvent(session_id="s1", action="page_view", category="A", timestamp=datetime(2024, 1, 1, 12, 2)),
+            ClickEvent(
+                session_id="s1",
+                action="page_view",
+                category="A",
+                timestamp=datetime(2024, 1, 1, 12, 0),
+            ),
+            ClickEvent(
+                session_id="s1",
+                action="page_view",
+                category="B",
+                timestamp=datetime(2024, 1, 1, 12, 1),
+            ),
+            ClickEvent(
+                session_id="s1",
+                action="page_view",
+                category="A",
+                timestamp=datetime(2024, 1, 1, 12, 2),
+            ),
         ]
         features = engineer.engineer(events)
         assert features.categories_viewed == 2
@@ -55,8 +82,18 @@ class TestFeatureEngineer:
     def test_cart_value_per_minute(self):
         engineer = FeatureEngineer()
         events = [
-            ClickEvent(session_id="s1", action="add_to_cart", value=120, timestamp=datetime(2024, 1, 1, 12, 0)),
-            ClickEvent(session_id="s1", action="add_to_cart", value=120, timestamp=datetime(2024, 1, 1, 12, 4)),
+            ClickEvent(
+                session_id="s1",
+                action="add_to_cart",
+                value=120,
+                timestamp=datetime(2024, 1, 1, 12, 0),
+            ),
+            ClickEvent(
+                session_id="s1",
+                action="add_to_cart",
+                value=120,
+                timestamp=datetime(2024, 1, 1, 12, 4),
+            ),
         ]
         features = engineer.engineer(events)
         assert features.total_cart_value == 240
@@ -65,9 +102,24 @@ class TestFeatureEngineer:
     def test_exploration_ratio(self):
         engineer = FeatureEngineer()
         events = [
-            ClickEvent(session_id="s1", action="page_view", category="A", timestamp=datetime(2024, 1, 1, 12, 0)),
-            ClickEvent(session_id="s1", action="page_view", category="B", timestamp=datetime(2024, 1, 1, 12, 1)),
-            ClickEvent(session_id="s1", action="page_view", category="C", timestamp=datetime(2024, 1, 1, 12, 2)),
+            ClickEvent(
+                session_id="s1",
+                action="page_view",
+                category="A",
+                timestamp=datetime(2024, 1, 1, 12, 0),
+            ),
+            ClickEvent(
+                session_id="s1",
+                action="page_view",
+                category="B",
+                timestamp=datetime(2024, 1, 1, 12, 1),
+            ),
+            ClickEvent(
+                session_id="s1",
+                action="page_view",
+                category="C",
+                timestamp=datetime(2024, 1, 1, 12, 2),
+            ),
         ]
         features = engineer.engineer(events)
         assert features.exploration_ratio == 2 / 4  # 2 switches / (3 views + 1)
@@ -75,9 +127,13 @@ class TestFeatureEngineer:
     def test_action_sequence_order(self):
         engineer = FeatureEngineer()
         events = [
-            ClickEvent(session_id="s1", action="search_query", timestamp=datetime(2024, 1, 1, 12, 0)),
+            ClickEvent(
+                session_id="s1", action="search_query", timestamp=datetime(2024, 1, 1, 12, 0)
+            ),
             ClickEvent(session_id="s1", action="page_view", timestamp=datetime(2024, 1, 1, 12, 1)),
-            ClickEvent(session_id="s1", action="add_to_cart", timestamp=datetime(2024, 1, 1, 12, 2)),
+            ClickEvent(
+                session_id="s1", action="add_to_cart", timestamp=datetime(2024, 1, 1, 12, 2)
+            ),
         ]
         features = engineer.engineer(events)
         assert features.action_sequence == ["search_query", "page_view", "add_to_cart"]
@@ -85,9 +141,15 @@ class TestFeatureEngineer:
     def test_checkout_conversion_rate(self):
         engineer = FeatureEngineer()
         events = [
-            ClickEvent(session_id="s1", action="add_to_cart", timestamp=datetime(2024, 1, 1, 12, 0)),
-            ClickEvent(session_id="s1", action="add_to_cart", timestamp=datetime(2024, 1, 1, 12, 1)),
-            ClickEvent(session_id="s1", action="checkout_start", timestamp=datetime(2024, 1, 1, 12, 2)),
+            ClickEvent(
+                session_id="s1", action="add_to_cart", timestamp=datetime(2024, 1, 1, 12, 0)
+            ),
+            ClickEvent(
+                session_id="s1", action="add_to_cart", timestamp=datetime(2024, 1, 1, 12, 1)
+            ),
+            ClickEvent(
+                session_id="s1", action="checkout_start", timestamp=datetime(2024, 1, 1, 12, 2)
+            ),
         ]
         features = engineer.engineer(events)
         assert features.checkout_conversion_rate == 1 / 3
@@ -96,15 +158,22 @@ class TestFeatureEngineer:
         engineer = FeatureEngineer()
         events = [
             ClickEvent(session_id="s1", action="page_view", timestamp=datetime(2024, 1, 1, 12, 0)),
-            ClickEvent(session_id="s1", action="page_view", timestamp=datetime(2024, 1, 1, 12, 0, 30)),
-            ClickEvent(session_id="s1", action="page_view", timestamp=datetime(2024, 1, 1, 12, 1, 0)),
+            ClickEvent(
+                session_id="s1", action="page_view", timestamp=datetime(2024, 1, 1, 12, 0, 30)
+            ),
+            ClickEvent(
+                session_id="s1", action="page_view", timestamp=datetime(2024, 1, 1, 12, 1, 0)
+            ),
         ]
         features = engineer.engineer(events)
         assert features.avg_inter_event_time == 30.0
 
     def test_polars_performance_dtype(self):
         engineer = FeatureEngineer()
-        events = [ClickEvent(session_id="s1", action="page_view", timestamp=datetime(2024, 1, 1, 12, 0)) for _ in range(100)]
+        events = [
+            ClickEvent(session_id="s1", action="page_view", timestamp=datetime(2024, 1, 1, 12, 0))
+            for _ in range(100)
+        ]
         features = engineer.engineer(events)
         assert features.total_actions == 100
         assert isinstance(features.page_views, int)

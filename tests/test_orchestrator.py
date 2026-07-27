@@ -8,15 +8,14 @@ thresholds, intent complexity, and exploration signals.
 Also verifies the full graph execution flow including the Critic Agent.
 """
 
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.agents.orchestrator import (
     OrchestratorState,
-    route_by_complexity,
     build_orchestrator_graph,
+    route_by_complexity,
 )
 
 
@@ -45,7 +44,6 @@ def _make_state(
 
 
 class TestRoutingLogic:
-
     def test_high_confidence_routes_to_system_1(self):
         state = _make_state(confidence=0.85)
         assert route_by_complexity(state) == "system_1"
@@ -112,7 +110,6 @@ class TestRoutingLogic:
 
 
 class TestGraphBuild:
-
     def test_graph_builds_successfully(self):
         graph = build_orchestrator_graph()
         assert graph is not None
@@ -127,8 +124,8 @@ class TestGraphBuild:
 # Full graph execution tests (System 2 → Critic → END)
 # ---------------------------------------------------------------------------
 
-class TestGraphExecution:
 
+class TestGraphExecution:
     @pytest.mark.asyncio
     async def test_system_2_flows_through_critic(self):
         """Verify the full state transition: route → system_2 → critic → END."""
@@ -163,7 +160,9 @@ class TestGraphExecution:
                 intent="PRICE_SENSITIVE",
             )
 
-            final_state = await graph.ainvoke(initial_state, config={"configurable": {"thread_id": "test"}})
+            final_state = await graph.ainvoke(
+                initial_state, config={"configurable": {"thread_id": "test"}}
+            )
 
         # Verify state transitions
         assert final_state["system"] == "system_2"
@@ -208,7 +207,9 @@ class TestGraphExecution:
                 intent="BROWSE",
             )
 
-            final_state = await graph.ainvoke(initial_state, config={"configurable": {"thread_id": "test"}})
+            final_state = await graph.ainvoke(
+                initial_state, config={"configurable": {"thread_id": "test"}}
+            )
 
         assert final_state["proposed_action"] == "SHOW_URGENCY"
         assert final_state["opa_evaluation"]["allowed"] is True
@@ -249,7 +250,9 @@ class TestGraphExecution:
                 intent="CHURN_RISK",
             )
 
-            final_state = await graph.ainvoke(initial_state, config={"configurable": {"thread_id": "test"}})
+            final_state = await graph.ainvoke(
+                initial_state, config={"configurable": {"thread_id": "test"}}
+            )
 
         assert final_state["proposed_action"] == "OFFER_DISCOUNT"
         assert final_state["opa_evaluation"]["allowed"] is False
@@ -267,7 +270,6 @@ class TestGraphExecution:
 
         with (
             patch("src.pipeline.process_event", new_callable=AsyncMock) as mock_process,
-            patch("src.models.events.ClickEvent") as mock_click,
             patch("src.agents.critic.run_critic", new_callable=AsyncMock) as mock_critic,
             patch("src.agents.orchestrator.settings") as mock_settings,
         ):
@@ -277,7 +279,9 @@ class TestGraphExecution:
             graph = build_orchestrator_graph()
             initial_state = _make_state(confidence=0.92, intent="CHECKOUT_INTENT")
 
-            final_state = await graph.ainvoke(initial_state, config={"configurable": {"thread_id": "test"}})
+            final_state = await graph.ainvoke(
+                initial_state, config={"configurable": {"thread_id": "test"}}
+            )
 
         assert final_state["system"] == "system_1"
         assert final_state["result"]["source"] == "system_1"
@@ -314,7 +318,9 @@ class TestGraphExecution:
             graph = build_orchestrator_graph()
             initial_state = _make_state(confidence=0.50)
 
-            final_state = await graph.ainvoke(initial_state, config={"configurable": {"thread_id": "test"}})
+            final_state = await graph.ainvoke(
+                initial_state, config={"configurable": {"thread_id": "test"}}
+            )
 
         # All new keys must be present and non-None
         assert final_state["proposed_action"] is not None

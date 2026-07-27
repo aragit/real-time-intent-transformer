@@ -15,11 +15,11 @@ State persistence is handled via LangGraph checkpointing (PostgresSaver in
 production, MemorySaver fallback for local testing).
 """
 
-from typing import TypedDict, Literal, Optional
-from loguru import logger
+from typing import Literal, TypedDict
 
-from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, StateGraph
+from loguru import logger
 
 from src.config import settings
 
@@ -29,18 +29,19 @@ MAX_STATE_EVENTS = 50
 
 class OrchestratorState(TypedDict):
     """State passed through the graph nodes."""
+
     session_id: str
-    customer_id: Optional[str]
+    customer_id: str | None
     event_type: str
-    intent: Optional[str]
-    confidence: Optional[float]
+    intent: str | None
+    confidence: float | None
     recent_events: list[dict]
     features: dict
-    system: Optional[Literal["system_1", "system_2"]]
-    result: Optional[dict]
-    proposed_action: Optional[str]
-    opa_evaluation: Optional[dict]
-    final_action: Optional[dict]
+    system: Literal["system_1", "system_2"] | None
+    result: dict | None
+    proposed_action: str | None
+    opa_evaluation: dict | None
+    final_action: dict | None
 
 
 async def system_1_fast_path(state: OrchestratorState) -> OrchestratorState:
@@ -48,8 +49,8 @@ async def system_1_fast_path(state: OrchestratorState) -> OrchestratorState:
     System 1: Deterministic, sub-50ms fast path.
     Runs existing ML ensemble + rule-based classification.
     """
-    from src.pipeline import process_event
     from src.models.events import ClickEvent
+    from src.pipeline import process_event
 
     logger.debug(f"System 1 fast path for session {state['session_id']}")
 
@@ -98,9 +99,7 @@ async def system_2_agentic_path(state: OrchestratorState) -> OrchestratorState:
     )
 
     proposed_action = planner_result.get("action", "NO_ACTION")
-    logger.info(
-        f"Planner proposed '{proposed_action}' for session {state['session_id']}"
-    )
+    logger.info(f"Planner proposed '{proposed_action}' for session {state['session_id']}")
 
     return {
         **state,
@@ -125,9 +124,7 @@ async def critic_node(state: OrchestratorState) -> OrchestratorState:
     proposed = state.get("proposed_action", "NO_ACTION")
     result = state.get("result", {})
 
-    logger.info(
-        f"Critic evaluating '{proposed}' for session {state['session_id']}"
-    )
+    logger.info(f"Critic evaluating '{proposed}' for session {state['session_id']}")
 
     evaluation = await run_critic(
         proposed_action=proposed,
@@ -193,17 +190,13 @@ def route_by_complexity(state: OrchestratorState) -> str:
         return "system_2"
 
     if intent in ("CHURN_RISK", "LOYAL_RETURNER"):
-        logger.info(
-            f"Complex intent ({intent}) → System 2 "
-            f"for session {state['session_id']}"
-        )
+        logger.info(f"Complex intent ({intent}) → System 2 for session {state['session_id']}")
         return "system_2"
 
     exploration = features.get("exploration_ratio", 0.0)
     if exploration > 0.6:
         logger.info(
-            f"High exploration ({exploration:.2f}) → System 2 "
-            f"for session {state['session_id']}"
+            f"High exploration ({exploration:.2f}) → System 2 for session {state['session_id']}"
         )
         return "system_2"
 
@@ -292,6 +285,7 @@ def _get_langfuse_handler():
     if settings.langfuse_public_key and settings.langfuse_secret_key:
         try:
             from langfuse.callback import CallbackHandler
+
             return CallbackHandler(
                 public_key=settings.langfuse_public_key,
                 secret_key=settings.langfuse_secret_key,

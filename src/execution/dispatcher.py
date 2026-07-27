@@ -1,7 +1,4 @@
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Optional
-
-from loguru import logger
+from datetime import UTC, datetime, timedelta
 
 from src.models.actions import ActionDispatch
 from src.models.features import SessionFeatures
@@ -21,7 +18,7 @@ class ActionDispatcher:
     }
 
     def __init__(self):
-        self._suppression: Dict[str, datetime] = {}
+        self._suppression: dict[str, datetime] = {}
 
     def dispatch(
         self,
@@ -33,7 +30,7 @@ class ActionDispatcher:
         governance_reason: str,
     ) -> ActionDispatch:
         # Suppression: no duplicate action within 15 minutes
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         last_dispatch = self._suppression.get(session_id)
         if last_dispatch and (now - last_dispatch) < timedelta(minutes=15):
             return ActionDispatch(

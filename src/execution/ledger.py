@@ -1,6 +1,5 @@
 import sqlite3
 from datetime import datetime
-from typing import List, Optional
 
 from loguru import logger
 
@@ -11,7 +10,7 @@ from src.models.actions import ActionDispatch
 class ActionLedger:
     """Immutable log of every action dispatched."""
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         self.db_path = db_path or settings.database_url.replace("sqlite:///", "")
         self._init_db()
 
@@ -58,7 +57,7 @@ class ActionLedger:
             )
             conn.commit()
 
-    def get_history(self, session_id: str) -> List[ActionDispatch]:
+    def get_history(self, session_id: str) -> list[ActionDispatch]:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(

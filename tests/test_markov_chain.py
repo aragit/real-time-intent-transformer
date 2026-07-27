@@ -42,7 +42,7 @@ class TestMarkovIntentModel:
 
     def test_probability_normalization(self):
         m = MarkovIntentModel()
-        next_state = m.predict_next_state("BROWSING", [])
+        m.predict_next_state("BROWSING", [])
         probs = m.TRANSITION_MATRIX["BROWSING"]
         assert abs(sum(probs.values()) - 1.0) < 0.01
 

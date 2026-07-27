@@ -1,7 +1,9 @@
+from datetime import UTC
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
-from httpx import AsyncClient, ASGITransport
 from fastapi import status
+from httpx import ASGITransport, AsyncClient
 
 from src.main import app
 
@@ -15,6 +17,7 @@ async def test_health_endpoint():
         assert data["status"] == "healthy"
         assert "timestamp" in data
 
+
 @pytest.mark.asyncio
 async def test_root_endpoint():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -22,11 +25,13 @@ async def test_root_endpoint():
         assert response.status_code == status.HTTP_200_OK
         assert "real-time-intent-transformer" in response.json()["message"]
 
+
 @pytest.mark.asyncio
 async def test_get_features_not_found():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/sessions/nonexistent/features")
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
 
 @pytest.mark.asyncio
 async def test_get_intent_not_found():
@@ -34,17 +39,20 @@ async def test_get_intent_not_found():
         response = await client.get("/sessions/nonexistent/intent")
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
+
 @pytest.mark.asyncio
 async def test_get_markov_not_found():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/sessions/nonexistent/markov")
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
+
 @pytest.mark.asyncio
 async def test_get_customer_not_found():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/customers/nonexistent/profile")
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
 
 @pytest.mark.asyncio
 async def test_intents_distribution_stub():
@@ -54,6 +62,7 @@ async def test_intents_distribution_stub():
         data = response.json()
         assert "distribution" in data
         assert "BROWSE" in data["distribution"]
+
 
 @pytest.mark.asyncio
 async def test_dispatch_action_minimal():
@@ -66,10 +75,14 @@ async def test_dispatch_action_minimal():
         mock_cls.return_value = mock_classifier
         mock_gov.return_value = (True, "")
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.post("/actions/dispatch", params={"session_id": "s_dispatch", "intent": "BROWSE", "confidence": 0.8})
+            response = await client.post(
+                "/actions/dispatch",
+                params={"session_id": "s_dispatch", "intent": "BROWSE", "confidence": 0.8},
+            )
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
             assert data["action"] == "RECOMMEND_ALTERNATIVE"
+
 
 @pytest.mark.asyncio
 async def test_get_action_history_empty():
@@ -78,13 +91,15 @@ async def test_get_action_history_empty():
         assert response.status_code == status.HTTP_200_OK
         assert response.json() == []
 
+
 @pytest.mark.asyncio
 async def test_ingest_event_accepted():
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     payload = {
         "session_id": "s_test",
         "customer_id": "c_test",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "action": "page_view",
         "product_id": "p1",
         "category": "test",
@@ -98,14 +113,16 @@ async def test_ingest_event_accepted():
             assert "event_id" in response.json()
             mock_ingest.assert_called_once()
 
+
 @pytest.mark.asyncio
 async def test_ingest_batch_accepted():
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     payload = [
         {
             "session_id": "s_batch",
             "action": "page_view",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "metadata": {},
         }
         for _ in range(5)

@@ -16,13 +16,13 @@ This is the closed-loop feedback that enables the system to self-improve.
 import asyncio
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Optional
 
 import asyncpg
 from loguru import logger
-from langfuse.decorators import observe
 
+from langfuse.decorators import observe
 from src.config import settings
 
 # Lazy-initialized components
@@ -30,7 +30,7 @@ _llm = None
 _evaluator: Optional["EvaluatorAgent"] = None
 
 # Concurrency semaphore for LLM calls to prevent OOM under burst traffic.
-_llm_semaphore: Optional[asyncio.Semaphore] = None
+_llm_semaphore: asyncio.Semaphore | None = None
 
 LLM_TIMEOUT_SECONDS = 30.0
 LLM_MAX_CONCURRENCY = 10
@@ -61,13 +61,19 @@ def _get_llm():
     global _llm
     if _llm is None:
         if settings.llm_provider == "ollama":
-            from langchain_community.chat_models import ChatOllama
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=DeprecationWarning)
+                from langchain_community.chat_models import ChatOllama
+
             _llm = ChatOllama(
                 model=settings.llm_model,
                 base_url=settings.llm_base_url.replace("/v1", ""),
             )
         else:
             from langchain_openai import ChatOpenAI
+
             _llm = ChatOpenAI(
                 model=settings.llm_model,
                 base_url=settings.llm_base_url,
@@ -161,10 +167,10 @@ class EvaluatorAgent:
     contention with the System 1 hot-path.
     """
 
-    def __init__(self, pg_dsn: Optional[str] = None):
+    def __init__(self, pg_dsn: str | None = None):
         self._dsn = pg_dsn or settings.postgres_dsn
-        self._pool: Optional[asyncpg.Pool] = None
-        self._read_pool: Optional[asyncpg.Pool] = None
+        self._pool: asyncpg.Pool | None = None
+        self._read_pool: asyncpg.Pool | None = None
 
     async def _get_pool(self) -> asyncpg.Pool:
         """Lazy-initialize the asyncpg connection pool (primary, for writes)."""
@@ -200,9 +206,7 @@ class EvaluatorAgent:
         async with self._pool.acquire() as conn:
             await conn.execute(METRICS_SCHEMA_SQL)
 
-    async def _fetch_recent_actions(
-        self, batch_size: int
-    ) -> list[dict]:
+    async def _fetch_recent_actions(self, batch_size: int) -> list[dict]:
         """
         Fetch the last batch_size actions from the action_ledger.
 
@@ -234,12 +238,10 @@ class EvaluatorAgent:
 
         Queries the local SQLite event store (sync) via thread pool.
         """
-        from src.memory import get_event_store
-
-        event_store = get_event_store()
 
         def _sync_check() -> bool:
             import sqlite3
+
             from src.config import settings as cfg
 
             db_path = cfg.database_url.replace("sqlite:///", "")
@@ -272,9 +274,7 @@ class EvaluatorAgent:
         return await asyncio.to_thread(_sync_check)
 
     @observe(as_type="generation")
-    async def _run_llm_analysis(
-        self, failed_actions: list[dict]
-    ) -> dict:
+    async def _run_llm_analysis(self, failed_actions: list[dict]) -> dict:
         """
         Use the local LLM to analyze failed interventions.
 
@@ -309,10 +309,12 @@ class EvaluatorAgent:
             sem = _get_llm_semaphore()
             async with sem:
                 response = await asyncio.wait_for(
-                    llm.invoke([
-                        SystemMessage(content=JUDGE_SYSTEM_PROMPT),
-                        HumanMessage(content=user_prompt),
-                    ]),
+                    llm.ainvoke(
+                        [
+                            SystemMessage(content=JUDGE_SYSTEM_PROMPT),
+                            HumanMessage(content=user_prompt),
+                        ]
+                    ),
                     timeout=LLM_TIMEOUT_SECONDS,
                 )
 
@@ -334,9 +336,7 @@ class EvaluatorAgent:
             "confidence_threshold_recommendation": settings.system_2_confidence_threshold,
         }
 
-    def _detect_drift(
-        self, conversion_rate: float, history: list[float]
-    ) -> bool:
+    def _detect_drift(self, conversion_rate: float, history: list[float]) -> bool:
         """
         Detect if conversion rate has dropped significantly.
 
@@ -394,7 +394,7 @@ class EvaluatorAgent:
             action_time = action["created_at"]
             # Ensure action_time is timezone-aware
             if action_time.tzinfo is None:
-                action_time = action_time.replace(tzinfo=timezone.utc)
+                action_time = action_time.replace(tzinfo=UTC)
 
             is_converted = await self._check_conversion(session_id, action_time)
 
@@ -409,14 +409,16 @@ class EvaluatorAgent:
                     except (json.JSONDecodeError, TypeError):
                         payload = {}
 
-                failed_actions.append({
-                    "action_type": action["action_type"],
-                    "intent": action["intent"],
-                    "confidence": action["confidence"],
-                    "reason": payload.get("reason", ""),
-                    "cart_value": 0.0,  # Not stored in ledger payload
-                    "duration_sec": 0.0,
-                })
+                failed_actions.append(
+                    {
+                        "action_type": action["action_type"],
+                        "intent": action["intent"],
+                        "confidence": action["confidence"],
+                        "reason": payload.get("reason", ""),
+                        "cart_value": 0.0,  # Not stored in ledger payload
+                        "duration_sec": 0.0,
+                    }
+                )
 
         conversion_rate = converted / len(actions) if actions else 0.0
 
@@ -473,9 +475,7 @@ class EvaluatorAgent:
                 json.dumps(metrics.diagnostics),
             )
 
-    async def get_recent_metrics(
-        self, limit: int = 10
-    ) -> list[dict]:
+    async def get_recent_metrics(self, limit: int = 10) -> list[dict]:
         """Retrieve recent evaluation metrics for monitoring dashboards."""
         pool = await self._get_pool()
         async with pool.acquire() as conn:

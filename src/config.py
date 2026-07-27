@@ -1,7 +1,5 @@
-from typing import Optional
-
+from pydantic import ConfigDict, Field
 from pydantic_settings import BaseSettings
-from pydantic import Field, ConfigDict
 
 
 class Settings(BaseSettings):
@@ -21,7 +19,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     use_pg_ledger: bool = Field(default=False)
     postgres_dsn: str = "postgresql://postgres:postgres@localhost:5432/intent_transformer"
-    postgres_read_replica_dsn: Optional[str] = None
+    postgres_read_replica_dsn: str | None = None
     neo4j_uri: str = "bolt://localhost:7687"
     neo4j_user: str = "neo4j"
     neo4j_password: str = "password"
@@ -30,9 +28,13 @@ class Settings(BaseSettings):
     llm_base_url: str = "http://localhost:11434/v1"
     llm_api_key: str = "ollama"
     system_2_confidence_threshold: float = 0.70
-    langfuse_public_key: Optional[str] = None
-    langfuse_secret_key: Optional[str] = None
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
     langfuse_host: str = "http://localhost:3000"
+    vllm_base_url: str = "http://localhost:8080/v1"
+    vllm_model: str = "google/gemma-3n-E4B-it"
+    vllm_api_key: str = "EMPTY"
+    vllm_timeout: float = 5.0
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 

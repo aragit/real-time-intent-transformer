@@ -13,11 +13,11 @@ import asyncio
 
 from loguru import logger
 
-from src.agents.evaluator import get_evaluator, close_evaluator
+from src.agents.evaluator import close_evaluator, get_evaluator
 from src.observability.metrics import (
-    EVALUATOR_DRIFT_FLAGGED,
-    EVALUATOR_BATCH_CONVERSION_RATE,
     EVALUATOR_BATCH_ACTIONS,
+    EVALUATOR_BATCH_CONVERSION_RATE,
+    EVALUATOR_DRIFT_FLAGGED,
 )
 
 
@@ -34,10 +34,7 @@ async def start_evaluator_loop(interval_seconds: int = 300, batch_size: int = 10
         interval_seconds: Time between evaluation batches (default: 300s = 5min).
         batch_size: Number of recent actions to evaluate per batch.
     """
-    logger.info(
-        f"Evaluator worker started (interval={interval_seconds}s, "
-        f"batch_size={batch_size})"
-    )
+    logger.info(f"Evaluator worker started (interval={interval_seconds}s, batch_size={batch_size})")
 
     evaluator = get_evaluator()
 

@@ -18,10 +18,10 @@ import pytest
 
 from src.agents.evaluator import EvaluationMetrics
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_ok_metrics() -> EvaluationMetrics:
     return EvaluationMetrics(
@@ -49,8 +49,8 @@ def _make_drift_metrics() -> EvaluationMetrics:
 # Worker Loop Tests
 # ===========================================================================
 
-class TestEvaluatorLoop:
 
+class TestEvaluatorLoop:
     @pytest.mark.asyncio
     async def test_loop_invokes_batch_at_least_once(self):
         """Worker loop should call run_evaluation_batch within a short interval."""
@@ -79,9 +79,7 @@ class TestEvaluatorLoop:
         with patch("src.workers.evaluator_worker.get_evaluator", return_value=mock_evaluator):
             from src.workers.evaluator_worker import start_evaluator_loop
 
-            task = asyncio.create_task(
-                start_evaluator_loop(interval_seconds=0.05, batch_size=50)
-            )
+            task = asyncio.create_task(start_evaluator_loop(interval_seconds=0.05, batch_size=50))
             await asyncio.sleep(0.2)
             task.cancel()
             try:
@@ -143,8 +141,8 @@ class TestEvaluatorLoop:
 # Worker Shutdown Tests
 # ===========================================================================
 
-class TestEvaluatorShutdown:
 
+class TestEvaluatorShutdown:
     @pytest.mark.asyncio
     async def test_cancelled_task_stops_cleanly(self):
         """Cancelling the worker task should exit the loop gracefully."""
@@ -188,7 +186,9 @@ class TestEvaluatorShutdown:
     @pytest.mark.asyncio
     async def test_stop_worker_releases_resources(self):
         """stop_evaluator_worker should call close_evaluator."""
-        with patch("src.workers.evaluator_worker.close_evaluator", new_callable=AsyncMock) as mock_close:
+        with patch(
+            "src.workers.evaluator_worker.close_evaluator", new_callable=AsyncMock
+        ) as mock_close:
             from src.workers.evaluator_worker import stop_evaluator_worker
 
             await stop_evaluator_worker()

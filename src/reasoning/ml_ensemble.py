@@ -1,5 +1,4 @@
 import os
-from typing import Tuple, Optional
 
 import joblib
 import numpy as np
@@ -54,11 +53,11 @@ class MLEnsembleClassifier:
             logger.warning(f"No model found at {path}. Using rule-based fallback.")
 
     def _vectorize(self, features: SessionFeatures) -> np.ndarray:
-        return np.array([
-            getattr(features, name, 0.0) for name in self.FEATURE_ORDER
-        ]).reshape(1, -1)
+        return np.array([getattr(features, name, 0.0) for name in self.FEATURE_ORDER]).reshape(
+            1, -1
+        )
 
-    def classify(self, features: SessionFeatures) -> Tuple[str, float, str]:
+    def classify(self, features: SessionFeatures) -> tuple[str, float, str]:
         """
         Returns (intent, confidence, method).
         """

@@ -1,5 +1,4 @@
 import json
-from typing import Optional
 
 from aiokafka import AIOKafkaConsumer
 from loguru import logger
@@ -9,9 +8,9 @@ from src.models.events import ClickEvent
 
 
 class ClickstreamConsumer:
-    def __init__(self, bootstrap_servers: Optional[str] = None):
+    def __init__(self, bootstrap_servers: str | None = None):
         self.bootstrap_servers = bootstrap_servers or settings.kafka_bootstrap_servers
-        self._consumer: Optional[AIOKafkaConsumer] = None
+        self._consumer: AIOKafkaConsumer | None = None
 
     async def start(self):
         self._consumer = AIOKafkaConsumer(
@@ -22,7 +21,9 @@ class ClickstreamConsumer:
             auto_offset_reset="earliest",
         )
         await self._consumer.start()
-        logger.info(f"Kafka consumer started: {self.bootstrap_servers}, group={settings.kafka_consumer_group}")
+        logger.info(
+            f"Kafka consumer started: {self.bootstrap_servers}, group={settings.kafka_consumer_group}"
+        )
 
     async def stop(self):
         if self._consumer:

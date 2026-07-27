@@ -13,11 +13,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import joblib
 import polars as pl
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split
 
-from src.perception.feature_engineer import FeatureEngineer
 from src.models.events import ClickEvent
+from src.perception.feature_engineer import FeatureEngineer
 
 
 def load_events(path: str = "data/synthetic_clicks.csv") -> pl.DataFrame:
@@ -33,38 +33,42 @@ def events_to_features(df: pl.DataFrame) -> tuple:
         events = []
         n_events = len(session["event_id"])
         for i in range(n_events):
-            events.append(ClickEvent(
-                event_id=session["event_id"][i],
-                session_id=session["session_id"],
-                customer_id=session["customer_id"][i],
-                timestamp=session["timestamp"][i],
-                action=session["action"][i],
-                product_id=session["product_id"][i],
-                category=session["category"][i],
-                value=session["value"][i] if session["value"][i] is not None else None,
-                metadata=json.loads(session["metadata"][i]) if session["metadata"][i] else {},
-            ))
+            events.append(
+                ClickEvent(
+                    event_id=session["event_id"][i],
+                    session_id=session["session_id"],
+                    customer_id=session["customer_id"][i],
+                    timestamp=session["timestamp"][i],
+                    action=session["action"][i],
+                    product_id=session["product_id"][i],
+                    category=session["category"][i],
+                    value=session["value"][i] if session["value"][i] is not None else None,
+                    metadata=json.loads(session["metadata"][i]) if session["metadata"][i] else {},
+                )
+            )
         features = engineer.engineer(events)
-        X.append([
-            features.session_duration_sec,
-            features.total_actions,
-            features.page_views,
-            features.cart_adds,
-            features.cart_removes,
-            features.checkouts,
-            features.searches,
-            features.total_cart_value,
-            features.max_item_value,
-            features.avg_item_value,
-            features.categories_viewed,
-            features.category_switches,
-            features.cart_conversion_rate,
-            features.checkout_conversion_rate,
-            features.cart_abandon_rate,
-            features.exploration_ratio,
-            features.cart_value_per_minute,
-            features.avg_inter_event_time,
-        ])
+        X.append(
+            [
+                features.session_duration_sec,
+                features.total_actions,
+                features.page_views,
+                features.cart_adds,
+                features.cart_removes,
+                features.checkouts,
+                features.searches,
+                features.total_cart_value,
+                features.max_item_value,
+                features.avg_item_value,
+                features.categories_viewed,
+                features.category_switches,
+                features.cart_conversion_rate,
+                features.checkout_conversion_rate,
+                features.cart_abandon_rate,
+                features.exploration_ratio,
+                features.cart_value_per_minute,
+                features.avg_inter_event_time,
+            ]
+        )
         y.append(session["ground_truth_intent"][0])
 
     return X, y
@@ -75,7 +79,9 @@ def train():
     df = load_events()
     X, y = events_to_features(df)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
 
     clf = RandomForestClassifier(
         n_estimators=100,

@@ -1,6 +1,5 @@
 from fastapi import APIRouter
 
-from src.memory import get_event_store
 from src.perception.feature_engineer import FeatureEngineer
 from src.reasoning.ml_ensemble import MLEnsembleClassifier
 
@@ -21,4 +20,8 @@ async def get_intent_distribution():
         "CHURN_RISK": 0,
         "LOYAL_RETURNER": 0,
     }
-    return {"distribution": distribution, "total_sessions": 0, "note": "Stub: requires session indexing for production"}
+    return {
+        "distribution": distribution,
+        "total_sessions": 0,
+        "note": "Stub: requires session indexing for production",
+    }

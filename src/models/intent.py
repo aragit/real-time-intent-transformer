@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
+
 from pydantic import BaseModel, Field
 
 from src.models.features import SessionFeatures
@@ -11,5 +11,5 @@ class IntentPrediction(BaseModel):
     confidence: float
     method: str  # rule_based, ml_ensemble, markov_chain
     features: SessionFeatures
-    predicted_next_state: Optional[str] = None
-    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    predicted_next_state: str | None = None
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -2,8 +2,8 @@ from fastapi import APIRouter
 
 from src.execution import get_action_ledger
 from src.models.actions import ActionDispatch
-from src.pipeline import process_event
 from src.models.events import ClickEvent
+from src.pipeline import process_event
 
 router = APIRouter()
 

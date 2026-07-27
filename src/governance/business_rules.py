@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Any
 
 
 class BusinessRules:
@@ -8,7 +8,9 @@ class BusinessRules:
     """
 
     @staticmethod
-    def evaluate(action: str, customer: Dict[str, Any], features: Dict[str, Any]) -> tuple[bool, str]:
+    def evaluate(
+        action: str, customer: dict[str, Any], features: dict[str, Any]
+    ) -> tuple[bool, str]:
         """
         Returns (allowed, reason).
         """

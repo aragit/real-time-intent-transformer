@@ -10,7 +10,6 @@ These tools provide the LLM planner with structured context about:
 """
 
 import json
-from typing import Optional
 
 from langchain_core.tools import tool
 from loguru import logger
@@ -91,17 +90,22 @@ async def query_product_graph(
         records = [dict(record) async for record in result]
 
     if not records:
-        return json.dumps({
-            "category": category,
-            "products": [],
-            "message": f"No products found in category '{category}'. The knowledge graph may need seeding.",
-        })
+        return json.dumps(
+            {
+                "category": category,
+                "products": [],
+                "message": f"No products found in category '{category}'. The knowledge graph may need seeding.",
+            }
+        )
 
-    return json.dumps({
-        "category": category,
-        "products": records,
-        "total_found": len(records),
-    }, default=str)
+    return json.dumps(
+        {
+            "category": category,
+            "products": records,
+            "total_found": len(records),
+        },
+        default=str,
+    )
 
 
 @tool
@@ -137,21 +141,28 @@ async def get_customer_affinity(
 
     async with driver.session() as session:
         result = await session.run(
-            cypher, customer_id=customer_id, max_categories=max_categories,
+            cypher,
+            customer_id=customer_id,
+            max_categories=max_categories,
             timeout=NEO4J_QUERY_TIMEOUT,
         )
         records = [dict(record) async for record in result]
 
     if not records:
-        return json.dumps({
-            "customer_id": customer_id,
-            "affinities": [],
-            "message": f"No purchase history found for customer '{customer_id}'.",
-        })
+        return json.dumps(
+            {
+                "customer_id": customer_id,
+                "affinities": [],
+                "message": f"No purchase history found for customer '{customer_id}'.",
+            }
+        )
 
-    return json.dumps({
-        "customer_id": customer_id,
-        "affinities": records,
-        "top_category": records[0]["category"] if records else None,
-        "total_categories": len(records),
-    }, default=str)
+    return json.dumps(
+        {
+            "customer_id": customer_id,
+            "affinities": records,
+            "top_category": records[0]["category"] if records else None,
+            "total_categories": len(records),
+        },
+        default=str,
+    )

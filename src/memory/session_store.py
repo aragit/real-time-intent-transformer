@@ -1,17 +1,15 @@
 import sqlite3
-from datetime import datetime
-from typing import List, Optional
+from datetime import UTC, datetime, timedelta
 
 from loguru import logger
 
 from src.config import settings
-from src.models.events import ClickEvent
 
 
 class SessionStore:
     """SQLite-backed session store with TTL."""
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         self.db_path = db_path or settings.database_url.replace("sqlite:///", "")
         self._init_db()
 
@@ -29,8 +27,8 @@ class SessionStore:
             conn.commit()
         logger.info("SessionStore initialized")
 
-    def upsert(self, session_id: str, customer_id: Optional[str], ttl_hours: int = 24) -> None:
-        now = datetime.utcnow()
+    def upsert(self, session_id: str, customer_id: str | None, ttl_hours: int = 24) -> None:
+        now = datetime.now(UTC)
         expires = now + timedelta(hours=ttl_hours)
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
@@ -45,7 +43,7 @@ class SessionStore:
             )
             conn.commit()
 
-    def get(self, session_id: str) -> Optional[dict]:
+    def get(self, session_id: str) -> dict | None:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
@@ -57,6 +55,8 @@ class SessionStore:
 
     def delete_expired(self) -> int:
         with sqlite3.connect(self.db_path) as conn:
-            cur = conn.execute("DELETE FROM sessions WHERE expires_at < ?", (datetime.utcnow().isoformat(),))
+            cur = conn.execute(
+                "DELETE FROM sessions WHERE expires_at < ?", (datetime.now(UTC).isoformat(),)
+            )
             conn.commit()
             return cur.rowcount
