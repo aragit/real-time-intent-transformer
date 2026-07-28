@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/tests-261%2F261%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-290%2F290%20passing-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/coverage-71%25-yellowgreen" alt="Coverage">
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
@@ -140,7 +140,7 @@ A persistent background worker periodically:
 | **P3** | CORS configurable origins | ✅ Fixed |
 | **P3** | Secrets removed from config defaults | ✅ Fixed |
 
-**Test Suite: 261/261 passing | Coverage: 71%**
+**Test Suite: 290/290 passing | Coverage: 71%**
 
 ---
 
@@ -150,9 +150,9 @@ A persistent background worker periodically:
 
 - Python 3.11+
 - Docker & Docker Compose (for Kafka + OPA)
-- (Optional) Ollama for local LLM inference
-- (Optional) PostgreSQL for checkpointing and audit ledger
-- (Optional) Neo4j for GraphRAG product retrieval
+- Ollama (or OpenAI) for LLM inference
+- PostgreSQL for checkpointing and audit ledger
+- Neo4j for GraphRAG product retrieval
 
 ### Installation
 
@@ -218,7 +218,7 @@ curl http://localhost:8000/sessions/sess_001/intent
   "session_id": "sess_001",
   "intent": "CHECKOUT_INTENT",
   "confidence": 0.857,
-  "method": "rule_based",
+  "method": "system_1",
   "features": {
     "session_duration_sec": 245.0,
     "page_views": 3,
@@ -226,7 +226,8 @@ curl http://localhost:8000/sessions/sess_001/intent
     "checkouts": 1,
     "total_cart_value": 199.98
   },
-  "predicted_next_state": "PURCHASE"
+  "predicted_next_state": "PURCHASE",
+  "generated_at": "2026-07-29T12:00:00Z"
 }
 ```
 
@@ -273,27 +274,29 @@ pytest tests/test_latency_benchmark.py -v    # Performance regression tests
 pytest tests/test_integration.py -v          # End-to-end flows
 ```
 
-### Test Suite Breakdown (261 Tests)
+### Test Suite Breakdown (290 Tests)
 
 | Category | Count | Coverage |
 |----------|-------|----------|
 | Evaluator Agent | 29 | Core batch processing, drift detection, LLM analysis |
 | Evaluator Worker | 8 | Lifecycle, Prometheus metrics, error handling |
-| Critic Agent | 12 | OPA validation, rewrite, hard rejection |
+| Planner Agent | 16 | LLM planning, action proposals, tool routing |
+| Critic Agent | 16 | OPA validation, rewrite, hard rejection |
 | Critic Security | 8 | Prompt injection, markdown jailbreak, Unicode bypass |
-| Orchestrator Graph | 15 | System 1/2 routing, state transitions, checkpointing |
-| Pipeline | 18 | Hydration, feature engineering, governance |
-| API Routes | 22 | All endpoints, error handling |
-| Models | 15 | Events, actions, features, intents |
-| Memory Stores | 18 | SQLite, Redis, session/event stores |
-| Reasoning | 12 | ML ensemble, Markov chain, rule classifier |
-| Execution | 15 | Dispatcher, suppressor, ledger |
-| Governance | 12 | OPA client, business rules |
-| Integration | 12 | End-to-end flows |
-| Benchmarks | 18 | Latency regression tests |
+| GraphRAG Tools | 11 | Neo4j product graph queries |
+| Orchestrator Graph | 22 | System 1/2 routing, state transitions, checkpointing |
+| API Routes | 11 | REST endpoints, error handling |
+| Governance | 22 | OPA client, business rules |
+| Closed-Loop Pipeline | 12 | Actor dispatch, episodic memory, verdicts |
+| Event Ingestion | 10 | Event store CRUD, validation |
+| Kafka Ingestion | 25 | Producer, consumer, lifecycle, malformed data |
 | Feature Engineering | 11 | Polars performance, edge cases |
-| Kafka Ingestion | 16 | Producer, consumer, lifecycle, malformed handling |
-| SLM Enrichment | 20 | Search query enrichment, intent signals, caching |
+| SLM Enrichment | 22 | Query enrichment, intent signals, caching |
+| Execution | 27 | Dispatcher, suppressor, SQLite/PG ledger |
+| Memory Stores | 13 | SQLite, Redis session/event stores |
+| Reasoning | 20 | ML ensemble, rule classifier, Markov chain |
+| Integration | 5 | End-to-end flows |
+| Benchmarks | 2 | Latency regression tests |
 
 ---
 
@@ -428,7 +431,7 @@ scrape_configs:
 | **Cache** | Redis | Session state caching |
 | **Observability** | Langfuse | Distributed tracing & LLM monitoring |
 | **Metrics** | Prometheus | Operational metrics |
-| **Testing** | pytest + pytest-asyncio | 261 tests, 71% coverage |
+| **Testing** | pytest + pytest-asyncio | 290 tests, 71% coverage |
 
 ---
 
@@ -485,7 +488,7 @@ real-time-intent-transformer/
 │   └── pipeline.py              # System 1 hot-path pipeline
 ├── policies/
 │   └── governance.rego           # OPA Rego v1 policies (deny guards)
-├── tests/                       # 261 tests, 100% pass rate
+├── tests/                       # 290 tests, 100% pass rate
 ├── docker/
 │   └── docker-compose.yml       # Kafka (KRaft) + OPA
 ├── scripts/
@@ -519,7 +522,7 @@ This repository underwent a comprehensive security and architectural audit. Key 
 - **Statistics:** Added Platt scaling sigmoid calibration; removed +1 smoothing bias
 - **Correctness:** Deterministic tie-breaking in rule classifier; per-instance HTTP clients
 - **Observability:** Instrumented Prometheus metrics; configurable CORS
-- **Testing:** 261 tests passing, 0 failures
+- **Testing:** 290 tests passing, 0 failures
 
 ---
 
