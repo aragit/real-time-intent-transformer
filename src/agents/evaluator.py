@@ -15,7 +15,6 @@ This is the closed-loop feedback that enables the system to self-improve.
 
 import asyncio
 import json
-import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Optional

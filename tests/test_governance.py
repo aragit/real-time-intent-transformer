@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import httpx
-import pytest
-import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.governance.opa_client import OPAClient, _http_client
+import httpx
+import pytest
+
+from src.governance.opa_client import OPAClient
 
 
 def _mock_response(json_data: dict, status_code: int = 200) -> MagicMock:
@@ -25,14 +25,6 @@ def _mock_response(json_data: dict, status_code: int = 200) -> MagicMock:
 class TestOPAClientGovernance:
     """Unit tests for OPAClient against the governance policy."""
 
-    @pytest.fixture(autouse=True)
-    def _reset_client(self):
-        """Reset the global httpx client before each test."""
-        import src.governance.opa_client as mod
-        mod._http_client = None
-        yield
-        mod._http_client = None
-
     @pytest.mark.asyncio
     async def test_15_percent_discount_checkout_allowed(self):
         """Rule: 15% discount for CHECKOUT_INTENT user is ALLOWED."""
@@ -42,7 +34,7 @@ class TestOPAClientGovernance:
         mock_http = AsyncMock()
         mock_http.post.return_value = mock_resp
 
-        with patch("src.governance.opa_client._get_shared_client", return_value=mock_http):
+        with patch.object(client, "_get_client", return_value=mock_http):
             result = await client.evaluate(
                 action="ISSUE_DISCOUNT",
                 intent="CHECKOUT_INTENT",
@@ -65,7 +57,7 @@ class TestOPAClientGovernance:
         mock_http = AsyncMock()
         mock_http.post.return_value = mock_resp
 
-        with patch("src.governance.opa_client._get_shared_client", return_value=mock_http):
+        with patch.object(client, "_get_client", return_value=mock_http):
             result = await client.evaluate(
                 action="ISSUE_DISCOUNT",
                 intent="CHECKOUT_INTENT",
@@ -83,7 +75,7 @@ class TestOPAClientGovernance:
         mock_http = AsyncMock()
         mock_http.post.return_value = mock_resp
 
-        with patch("src.governance.opa_client._get_shared_client", return_value=mock_http):
+        with patch.object(client, "_get_client", return_value=mock_http):
             result = await client.evaluate(
                 action="ISSUE_DISCOUNT",
                 intent="BROWSING",
@@ -101,7 +93,7 @@ class TestOPAClientGovernance:
         mock_http = AsyncMock()
         mock_http.post.return_value = mock_resp
 
-        with patch("src.governance.opa_client._get_shared_client", return_value=mock_http):
+        with patch.object(client, "_get_client", return_value=mock_http):
             result = await client.evaluate(action="LOG_ANALYTICS")
 
         assert result is True
@@ -115,7 +107,7 @@ class TestOPAClientGovernance:
         mock_http = AsyncMock()
         mock_http.post.return_value = mock_resp
 
-        with patch("src.governance.opa_client._get_shared_client", return_value=mock_http):
+        with patch.object(client, "_get_client", return_value=mock_http):
             result = await client.evaluate(action="RECOMMEND_PRODUCT")
 
         assert result is True
@@ -128,7 +120,7 @@ class TestOPAClientGovernance:
         mock_http = AsyncMock()
         mock_http.post.side_effect = httpx.ConnectError("Connection refused")
 
-        with patch("src.governance.opa_client._get_shared_client", return_value=mock_http):
+        with patch.object(client, "_get_client", return_value=mock_http):
             result = await client.evaluate(
                 action="ISSUE_DISCOUNT",
                 intent="CHECKOUT_INTENT",
@@ -145,7 +137,7 @@ class TestOPAClientGovernance:
         mock_http = AsyncMock()
         mock_http.post.side_effect = httpx.TimeoutException("Request timed out")
 
-        with patch("src.governance.opa_client._get_shared_client", return_value=mock_http):
+        with patch.object(client, "_get_client", return_value=mock_http):
             result = await client.evaluate(action="LOG_ANALYTICS")
 
         assert result is False
@@ -159,7 +151,7 @@ class TestOPAClientGovernance:
         mock_http = AsyncMock()
         mock_http.post.return_value = mock_resp
 
-        with patch("src.governance.opa_client._get_shared_client", return_value=mock_http):
+        with patch.object(client, "_get_client", return_value=mock_http):
             result = await client.evaluate(action="ISSUE_DISCOUNT", discount_value=5.0)
 
         assert result is False
@@ -173,25 +165,24 @@ class TestOPAClientGovernance:
         mock_http = AsyncMock()
         mock_http.post.return_value = mock_resp
 
-        with patch("src.governance.opa_client._get_shared_client", return_value=mock_http):
+        with patch.object(client, "_get_client", return_value=mock_http):
             result = await client.evaluate(action="RANDOM_ACTION_XYZ")
 
         assert result is False
 
     @pytest.mark.asyncio
     async def test_client_close_cleans_up(self):
-        """close() should clean up the shared httpx client."""
-        import src.governance.opa_client as mod
+        """close() should clean up the per-instance httpx client."""
+        client = OPAClient(base_url="http://mock:8181")
         mock_http = AsyncMock()
         mock_http.is_closed = False
         mock_http.aclose = AsyncMock()
-        mod._http_client = mock_http
+        client._client = mock_http
 
-        client = OPAClient(base_url="http://mock:8181")
         await client.close()
 
         mock_http.aclose.assert_called_once()
-        assert mod._http_client is None
+        assert client._client is None
 
     @pytest.mark.asyncio
     async def test_shared_client_reuse(self):
@@ -201,7 +192,7 @@ class TestOPAClientGovernance:
         mock_http = AsyncMock()
         mock_http.post.return_value = mock_resp
 
-        with patch("src.governance.opa_client._get_shared_client", return_value=mock_http):
+        with patch.object(client, "_get_client", return_value=mock_http):
             await client.evaluate(action="LOG_ANALYTICS")
             await client.evaluate(action="RECOMMEND_PRODUCT")
 
@@ -215,7 +206,7 @@ class TestOPAClientGovernance:
         mock_http = AsyncMock()
         mock_http.post.return_value = mock_resp
 
-        with patch("src.governance.opa_client._get_shared_client", return_value=mock_http):
+        with patch.object(client, "_get_client", return_value=mock_http):
             await client.evaluate(
                 action="ISSUE_DISCOUNT",
                 intent="CHECKOUT_INTENT",

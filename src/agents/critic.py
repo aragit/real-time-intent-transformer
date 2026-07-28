@@ -15,7 +15,6 @@ This ensures the LLM Planner cannot bypass business policy constraints
 """
 
 import asyncio
-import re
 
 from loguru import logger
 
@@ -76,7 +75,8 @@ Your job is to rewrite a non-compliant action into a policy-compliant alternativ
 
 ## Rules
 - You must output ONLY a JSON object, no other text.
-- The rewritten action must use one of: NO_ACTION, SHOW_URGENCY, SEND_ABANDON_EMAIL, OFFER_BUNDLE, SEND_TO_HUMAN, LOYALTY_REWARD, RECOMMEND_ALTERNATIVE
+- The rewritten action must use one of: NO_ACTION, SHOW_URGENCY, SEND_ABANDON_EMAIL,
+  OFFER_BUNDLE, SEND_TO_HUMAN, LOYALTY_REWARD, RECOMMEND_ALTERNATIVE
 - You CANNOT use APPLY_DISCOUNT or OFFER_DISCOUNT if OPA denied them.
 - Prefer the safest fallback: NO_ACTION or SEND_TO_HUMAN for ambiguous cases.
 

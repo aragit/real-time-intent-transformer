@@ -20,7 +20,6 @@ import pytest
 from src.ingestion.kafka_consumer import ClickstreamConsumer
 from src.models.events import ClickEvent
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

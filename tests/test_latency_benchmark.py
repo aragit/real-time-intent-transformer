@@ -152,7 +152,7 @@ class TestLatencyBenchmark:
             await process_event(warmup_event)
 
             # Benchmark: 10 concurrent events (realistic per-worker async concurrency)
-            NUM_EVENTS = 10
+            num_events = 10
             latencies: list[float] = []
 
             events = [
@@ -164,7 +164,7 @@ class TestLatencyBenchmark:
                     category="electronics",
                     value=float(i),
                 )
-                for i in range(NUM_EVENTS)
+                for i in range(num_events)
             ]
 
             # Record individual latencies
@@ -179,7 +179,7 @@ class TestLatencyBenchmark:
             )
 
             # Calculate percentiles
-            latencies_ms = [l * 1000 for l in latencies]
+            latencies_ms = [lat * 1000 for lat in latencies]
             p50 = statistics.median(latencies_ms)
             p90 = sorted(latencies_ms)[int(len(latencies_ms) * 0.9)]
             p95 = sorted(latencies_ms)[int(len(latencies_ms) * 0.95)]
@@ -190,7 +190,7 @@ class TestLatencyBenchmark:
             print("\n" + "=" * 60)
             print("SYSTEM 1 LATENCY BENCHMARK RESULTS")
             print("=" * 60)
-            print(f"  Events processed: {NUM_EVENTS}")
+            print(f"  Events processed: {num_events}")
             print(f"  Mean latency:     {mean_lat:.2f}ms")
             print(f"  p50 latency:      {p50:.2f}ms")
             print(f"  p90 latency:      {p90:.2f}ms")

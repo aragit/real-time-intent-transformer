@@ -1,15 +1,35 @@
 import asyncio
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
 from src.api.routes import actions, customers, events, health, intents, sessions
 from src.config import settings
 
 _evaluator_task: asyncio.Task | None = None
 _kafka_consumer = None
+
+
+class MetricsMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        from src.observability.metrics import REQUEST_COUNT, REQUEST_LATENCY
+
+        start = time.time()
+        response = await call_next(request)
+        duration = time.time() - start
+
+        REQUEST_COUNT.labels(
+            method=request.method,
+            endpoint=request.url.path,
+            status=response.status_code,
+        ).inc()
+        REQUEST_LATENCY.observe(duration)
+        return response
 
 
 @asynccontextmanager
@@ -83,6 +103,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(MetricsMiddleware)
 
 app.include_router(health.router, tags=["health"])
 app.include_router(events.router, tags=["events"])

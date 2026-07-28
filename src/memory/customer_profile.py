@@ -35,7 +35,8 @@ class CustomerProfileStore:
             conn.execute(
                 """
                 INSERT INTO customers
-                (customer_id, total_sessions, total_purchases, lifetime_value, avg_session_duration, preferred_categories, last_updated)
+                (customer_id, total_sessions, total_purchases, lifetime_value,
+                 avg_session_duration, preferred_categories, last_updated)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(customer_id) DO UPDATE SET
                     total_sessions = excluded.total_sessions,

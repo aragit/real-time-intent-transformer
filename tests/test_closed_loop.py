@@ -8,15 +8,16 @@ All external I/O (Qdrant, Ollama) is replaced with AsyncMock so the
 tests are fast, hermetic, and deterministic.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.actuator.dispatcher import ClosedLoopDispatcher, _VERDICT_ALLOWED, _VERDICT_DENIED
+import pytest
+
+from src.actuator.dispatcher import _VERDICT_ALLOWED, _VERDICT_DENIED, ClosedLoopDispatcher
 from src.memory.qdrant_ledger import (
-    QdrantEpisodicMemory,
-    _build_summary,
     COLLECTION_NAME,
     EMBEDDING_DIM,
+    QdrantEpisodicMemory,
+    _build_summary,
 )
 from src.models.actions import ActionDispatch
 

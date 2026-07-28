@@ -65,6 +65,6 @@ class RuleBasedClassifier:
         if total == 0:
             return "BROWSE", 0.0
 
-        best = max(scores, key=scores.get)
+        best = max(scores, key=lambda k: (scores[k], k))
         confidence = scores[best] / total
         return best, min(confidence, 1.0)

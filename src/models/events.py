@@ -10,7 +10,7 @@ class ClickEvent(BaseModel):
     session_id: str
     customer_id: str | None = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    action: str  # page_view, add_to_cart, remove_from_cart, checkout_start, purchase_complete, search_query, filter_apply
+    action: str  # page_view, add_to_cart, remove_from_cart, checkout_start, purchase_complete
     product_id: str | None = None
     category: str | None = None
     value: float | None = None

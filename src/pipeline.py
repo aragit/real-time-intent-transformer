@@ -156,7 +156,6 @@ async def process_event(event: ClickEvent) -> ActionDispatch:
     if slm_result and slm_result["confidence"] > confidence:
         intent = slm_result["intent"]
         confidence = slm_result["confidence"]
-        method = "slm_enrichment"
 
     # Stage 4: Governance evaluation (async OPA)
     action_dispatch_obj = _get_dispatcher()
@@ -206,6 +205,12 @@ async def process_event(event: ClickEvent) -> ActionDispatch:
     if dispatch.action != "NO_ACTION":
         suppressor.record(session_id, dispatch.action)
 
+    # Prometheus metrics
+    from src.observability.metrics import ACTIONS_DISPATCHED, INTENT_PREDICTIONS
+
+    INTENT_PREDICTIONS.labels(intent=intent).inc()
+    ACTIONS_DISPATCHED.labels(action=dispatch.action).inc()
+
     return dispatch
 
 
@@ -215,6 +220,10 @@ async def ingest_event(event: ClickEvent) -> None:
 
     Writes to both session store and event store asynchronously.
     """
+    from src.observability.metrics import EVENTS_INGESTED
+
+    EVENTS_INGESTED.inc()
+
     session_store = get_session_store()
     event_store = get_event_store()
 

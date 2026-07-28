@@ -11,7 +11,6 @@ indicating the ML ensemble cannot confidently classify the intent.
 """
 
 import json
-import re
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -209,7 +208,8 @@ Session Features:
 
 Please:
 1. Use query_product_graph to find products in the session's categories
-{"2. Use get_customer_affinity to check this customer's purchase history" if customer_id else "2. Note: customer is anonymous, no affinity data available"}
+{"2. Use get_customer_affinity to check this customer's purchase history" if customer_id else
+ "2. Note: customer is anonymous, no affinity data available"}
 3. Recommend the best intervention action"""
 
 

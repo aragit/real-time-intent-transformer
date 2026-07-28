@@ -10,7 +10,6 @@ NOT on the hot path. Falls back silently to keyword heuristics if the
 vLLM server is unreachable or returns malformed output.
 """
 
-import asyncio
 import json
 import time
 
@@ -123,7 +122,7 @@ class SLMEnrichment:
 
             return signals
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.debug(f"SLM enrichment timeout for query: {query[:50]}")
             return None
         except Exception as e:
@@ -180,7 +179,7 @@ class SLMEnrichment:
                 "confidence": float(result.get("confidence", 0.0)),
             }
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.debug("SLM intent enrichment timeout")
             return None
         except Exception as e:

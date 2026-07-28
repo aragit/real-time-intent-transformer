@@ -18,7 +18,6 @@ import pytest
 
 from src.reasoning.slm_enrichment import SLMEnrichment, get_slm_enrichment
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -362,7 +361,6 @@ class TestCaching:
 
 class TestSingleton:
     def test_get_slm_enrichment_returns_same_instance(self):
-        from src.reasoning.slm_enrichment import _slm
 
         # Reset singleton
         import src.reasoning.slm_enrichment as mod

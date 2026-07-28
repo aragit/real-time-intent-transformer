@@ -172,9 +172,11 @@ def route_by_complexity(state: OrchestratorState) -> str:
     - Intent is complex (CHURN_RISK, LOYAL_RETURNER)
     - Session shows high exploration ratio (ambiguous behavior)
     """
-    # State bounding: truncate recent_events to prevent checkpoint bloat
-    if len(state.get("recent_events", [])) > MAX_STATE_EVENTS:
-        state["recent_events"] = state["recent_events"][-MAX_STATE_EVENTS:]
+    # State bounding: truncate recent_events to prevent checkpoint bloat.
+    # Read-only here; LangGraph handles state updates via node returns.
+    recent = state.get("recent_events", [])
+    if len(recent) > MAX_STATE_EVENTS:
+        recent = recent[-MAX_STATE_EVENTS:]
 
     confidence = state.get("confidence")
     intent = state.get("intent")
