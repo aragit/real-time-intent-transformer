@@ -502,33 +502,8 @@ real-time-intent-transformer/
 Create `.env` from `.env.example`:
 
 ```bash
-# Required
-DATABASE_URL=sqlite:///./intent_transformer.db
-OPA_URL=http://localhost:8181
-
-# LLM (Ollama local)
-LLM_PROVIDER=ollama
-LLM_MODEL=qwen3-coder:4b
-LLM_BASE_URL=http://localhost:11434/v1
-
-# Optional: PostgreSQL for ledger + checkpointing
-USE_PG_LEDGER=false
-POSTGRES_DSN=postgresql://postgres:postgres@localhost:5432/intent_transformer
-
-# Optional: Langfuse observability
-LANGFUSE_PUBLIC_KEY=pk-lf-...
-LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_HOST=https://cloud.langfuse.com
-
-# Optional: Redis for session caching
-USE_REDIS_STORE=false
-REDIS_URL=redis://localhost:6379/0
-
-# CORS
-CORS_ORIGINS=["http://localhost:3000"]
-
-# Routing threshold
-SYSTEM_2_CONFIDENCE_THRESHOLD=0.70
+cp .env.example .env
+# then edit .env with your keys
 ```
 
 ---
