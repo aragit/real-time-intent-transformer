@@ -15,6 +15,7 @@ This ensures the LLM Planner cannot bypass business policy constraints
 """
 
 import asyncio
+import re
 
 from loguru import logger
 
@@ -26,6 +27,17 @@ CRITIC_LLM_TIMEOUT_SECONDS = 15.0
 
 # Lazy-initialized LLM for fallback rewriting
 _llm = None
+
+
+def _strip_v1_suffix(url: str) -> str:
+    """Strip /v1 suffix from a URL using proper URL parsing."""
+    from urllib.parse import urlparse, urlunsplit
+
+    parsed = urlparse(url)
+    path = parsed.path.rstrip("/")
+    if path.endswith("/v1"):
+        path = path[:-3]
+    return urlunsplit(parsed._replace(path=path))
 
 
 def _get_llm():
@@ -41,7 +53,7 @@ def _get_llm():
 
             _llm = ChatOllama(
                 model=settings.llm_model,
-                base_url=settings.llm_base_url.replace("/v1", ""),
+                base_url=_strip_v1_suffix(settings.llm_base_url),
             )
         else:
             from langchain_openai import ChatOpenAI
@@ -167,10 +179,9 @@ async def run_critic(
         # Parse JSON from LLM output
         import json
 
-        json_start = output.find("{")
-        json_end = output.rfind("}") + 1
-        if json_start >= 0 and json_end > json_start:
-            parsed = json.loads(output[json_start:json_end])
+        match = re.search(r"\{.*\}", output, re.DOTALL)
+        if match:
+            parsed = json.loads(match.group())
             fallback_action = parsed.get("action", "NO_ACTION")
             fallback_reasoning = parsed.get("reasoning", "Critic rewrite")
 

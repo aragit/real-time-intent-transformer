@@ -2,18 +2,30 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from src.api.routes import actions, customers, events, health, intents, sessions
 from src.config import settings
 
 _evaluator_task: asyncio.Task | None = None
+_kafka_consumer = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _evaluator_task
+    global _evaluator_task, _kafka_consumer
     logger.info(f"Starting {settings.app_name}")
+
+    # Start Kafka consumer
+    try:
+        from src.ingestion.kafka_consumer import ClickstreamConsumer
+
+        _kafka_consumer = ClickstreamConsumer()
+        await _kafka_consumer.start()
+        logger.info("Kafka consumer started")
+    except Exception as e:
+        logger.warning(f"Could not start Kafka consumer: {e}")
 
     # Start the evaluator background worker
     try:
@@ -29,6 +41,13 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info(f"Shutting down {settings.app_name}")
+
+    # Stop Kafka consumer
+    if _kafka_consumer:
+        try:
+            await _kafka_consumer.stop()
+        except Exception as e:
+            logger.warning(f"Error stopping Kafka consumer: {e}")
 
     # Cancel the evaluator worker
     if _evaluator_task and not _evaluator_task.done():
@@ -55,6 +74,14 @@ app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(health.router, tags=["health"])

@@ -15,6 +15,7 @@ This is the closed-loop feedback that enables the system to self-improve.
 
 import asyncio
 import json
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Optional
@@ -328,10 +329,9 @@ class EvaluatorAgent:
             output = response.content if hasattr(response, "content") else str(response)
 
             # Parse JSON from LLM output
-            json_start = output.find("{")
-            json_end = output.rfind("}") + 1
-            if json_start >= 0 and json_end > json_start:
-                return json.loads(output[json_start:json_end])
+            match = re.search(r"\{.*\}", output, re.DOTALL)
+            if match:
+                return json.loads(match.group())
 
         except Exception as e:
             logger.warning(f"LLM drift analysis failed: {e}")
@@ -434,9 +434,15 @@ class EvaluatorAgent:
         # Step 3: LLM-as-a-Judge drift analysis
         diagnostics = await self._run_llm_analysis(failed_actions)
 
-        # Step 4: Drift detection
-        # For now, use a simple heuristic; in production, query historical batches
-        drift_flagged = conversion_rate < 0.10 and len(actions) >= 10
+        # Step 4: Drift detection using historical batches
+        try:
+            recent = await self.get_recent_metrics(limit=20)
+            history = [m["conversion_rate"] for m in recent if m.get("conversion_rate") is not None]
+        except Exception:
+            history = []
+        drift_flagged = self._detect_drift(conversion_rate, history)
+        if not drift_flagged and not history and conversion_rate < 0.10 and len(actions) >= 10:
+            drift_flagged = True
 
         # Step 5: Compute critic rewrite success rate
         # This is a placeholder — in a full implementation, we'd track

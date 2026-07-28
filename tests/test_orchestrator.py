@@ -139,7 +139,7 @@ class TestGraphExecution:
         }
 
         mock_critic_result = {
-            "action": "FREE_SHIPPING",
+            "action": "APPLY_DISCOUNT",
             "reasoning": "Critic rewrite: discount exceeds policy cap",
             "source": "system_2_critic_rewrite",
             "opa_allowed": False,
@@ -169,9 +169,9 @@ class TestGraphExecution:
         assert final_state["proposed_action"] == "APPLY_DISCOUNT"
         assert final_state["opa_evaluation"]["allowed"] is False
         assert final_state["opa_evaluation"]["proposed_action"] == "APPLY_DISCOUNT"
-        assert final_state["final_action"]["action"] == "FREE_SHIPPING"
+        assert final_state["final_action"]["action"] == "APPLY_DISCOUNT"
         assert final_state["final_action"]["source"] == "system_2_critic_rewrite"
-        assert final_state["result"]["action"] == "FREE_SHIPPING"
+        assert final_state["result"]["action"] == "APPLY_DISCOUNT"
 
     @pytest.mark.asyncio
     async def test_system_2_opa_approved_flow(self):

@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import pytest
+
 from src.execution.dispatcher import ActionDispatcher
 from src.governance.business_rules import BusinessRules
 from src.ingestion.event_store import EventStore
@@ -9,7 +11,8 @@ from src.reasoning.ml_ensemble import MLEnsembleClassifier
 
 
 class TestIntegration:
-    def test_end_to_end_pipeline(self, tmp_path):
+    @pytest.mark.asyncio
+    async def test_end_to_end_pipeline(self, tmp_path):
         db = tmp_path / "integration.db"
         store = EventStore(db_path=str(db))
 
@@ -75,11 +78,11 @@ class TestIntegration:
             # LOYAL_RETURNER → governance blocks SHOW_URGENCY → NO_ACTION
             assert dispatch.action == "NO_ACTION"
 
-        from src.execution.ledger import ActionLedger
+        from src.execution.sqlite_ledger import SQLiteActionLedger
 
-        ledger = ActionLedger(db_path=str(db))
-        ledger.record(dispatch)
-        history = ledger.get_history("s1")
+        ledger = SQLiteActionLedger(db_path=str(db))
+        await ledger.record(dispatch)
+        history = await ledger.get_history("s1")
         assert len(history) == 1
         assert history[0].action == dispatch.action
 

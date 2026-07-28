@@ -22,11 +22,11 @@ class Settings(BaseSettings):
     postgres_read_replica_dsn: str | None = None
     neo4j_uri: str = "bolt://localhost:7687"
     neo4j_user: str = "neo4j"
-    neo4j_password: str = "password"
+    neo4j_password: str | None = Field(default=None)
     llm_provider: str = "ollama"
     llm_model: str = "llama3"
     llm_base_url: str = "http://localhost:11434/v1"
-    llm_api_key: str = "ollama"
+    llm_api_key: str | None = Field(default=None)
     system_2_confidence_threshold: float = 0.70
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None

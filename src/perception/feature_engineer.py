@@ -59,7 +59,7 @@ class FeatureEngineer:
         cart_conversion_rate = cart_adds / (page_views + 1)
         checkout_conversion_rate = checkouts / (cart_adds + 1)
         cart_abandon_rate = cart_removes / (cart_adds + 1) if cart_adds > 0 else 0.0
-        exploration_ratio = category_switches / (page_views + 1)
+        exploration_ratio = max(0.0, min(1.0, category_switches / (page_views + 1)))
 
         action_sequence = df["action"].to_list()
 

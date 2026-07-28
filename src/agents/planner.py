@@ -11,6 +11,7 @@ indicating the ML ensemble cannot confidently classify the intent.
 """
 
 import json
+import re
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -23,6 +24,17 @@ from src.config import settings
 # Lazy-initialized LLM
 _llm = None
 _planner = None
+
+
+def _strip_v1_suffix(url: str) -> str:
+    """Strip /v1 suffix from a URL using proper URL parsing."""
+    from urllib.parse import urlparse, urlunsplit
+
+    parsed = urlparse(url)
+    path = parsed.path.rstrip("/")
+    if path.endswith("/v1"):
+        path = path[:-3]
+    return urlunsplit(parsed._replace(path=path))
 
 
 PLANNER_SYSTEM_PROMPT = """You are an e-commerce intent resolver and customer intervention planner.
@@ -84,7 +96,7 @@ def _get_llm():
 
             _llm = ChatOllama(
                 model=settings.llm_model,
-                base_url=settings.llm_base_url.replace("/v1", ""),
+                base_url=_strip_v1_suffix(settings.llm_base_url),
             )
         else:
             from langchain_openai import ChatOpenAI
@@ -212,11 +224,10 @@ async def run_planner(
 
         # Try to parse JSON from the LLM output
         try:
-            # Find JSON in the output (may be wrapped in markdown)
-            json_start = output.find("{")
-            json_end = output.rfind("}") + 1
-            if json_start >= 0 and json_end > json_start:
-                parsed = json.loads(output[json_start:json_end])
+            # Robustly extract JSON block from LLM output (may be wrapped in markdown)
+            match = re.search(r"\{.*\}", output, re.DOTALL)
+            if match:
+                parsed = json.loads(match.group())
                 return {
                     "action": parsed.get("action", "NO_ACTION"),
                     "confidence": parsed.get("confidence", 0.5),
