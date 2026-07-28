@@ -7,6 +7,7 @@ Usage:
 
 import asyncio
 import signal
+import traceback
 
 from loguru import logger
 
@@ -26,18 +27,39 @@ async def main() -> None:
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, _request_shutdown)
 
-    await consumer.start()
+    try:
+        await consumer.start()
+    except Exception:
+        logger.error(
+            f"Consumer failed to start:\n{traceback.format_exc()}"
+        )
+        return
 
     run_task = asyncio.create_task(consumer.run())
-    await shutdown_event.wait()
+    try:
+        await shutdown_event.wait()
+    except Exception:
+        logger.error(
+            f"Shutdown wait interrupted:\n{traceback.format_exc()}"
+        )
 
     run_task.cancel()
     try:
         await run_task
     except asyncio.CancelledError:
         pass
+    except Exception:
+        logger.error(
+            f"Run task raised during cancellation:\n{traceback.format_exc()}"
+        )
 
-    await close_resources()
+    try:
+        await close_resources()
+    except Exception:
+        logger.error(
+            f"Error closing resources:\n{traceback.format_exc()}"
+        )
+
     logger.info("Consumer exited cleanly")
 
 

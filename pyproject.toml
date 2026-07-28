@@ -28,7 +28,8 @@ dependencies = [
     "langfuse>=2.0.0,<3.0.0",
     "langfuse-langchain>=0.1.0",
     "langchain",
-    "langchain-openai"
+    "langchain-openai",
+    "qdrant-client>=1.9.0"
 ]
 
 [project.optional-dependencies]

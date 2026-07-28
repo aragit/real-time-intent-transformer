@@ -40,7 +40,7 @@ class SQLiteActionLedger(BaseActionLedger):
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO action_ledger
+                INSERT OR REPLACE INTO action_ledger
                 (action_id, session_id, intent, confidence, action, reason,
                  dispatched_at, acknowledged, outcome)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)

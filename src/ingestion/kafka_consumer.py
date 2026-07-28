@@ -11,6 +11,7 @@ OOM under burst traffic. Graceful shutdown drains in-flight work.
 
 import asyncio
 import json
+import traceback
 
 from aiokafka import AIOKafkaConsumer
 from loguru import logger
@@ -35,24 +36,34 @@ class ClickstreamConsumer:
         self._tasks: set[asyncio.Task] = set()
 
     async def start(self):
-        self._consumer = AIOKafkaConsumer(
-            self.topic,
-            bootstrap_servers=self.bootstrap_servers,
-            group_id=settings.kafka_consumer_group,
-            value_deserializer=lambda v: json.loads(v.decode("utf-8")),
-            auto_offset_reset="earliest",
-        )
-        await self._consumer.start()
-        logger.info(
-            f"Kafka consumer started: {self.bootstrap_servers} "
-            f"topic={self.topic} group={settings.kafka_consumer_group}"
-        )
+        try:
+            self._consumer = AIOKafkaConsumer(
+                self.topic,
+                bootstrap_servers=self.bootstrap_servers,
+                group_id=settings.kafka_consumer_group,
+                value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+                auto_offset_reset="earliest",
+            )
+            await self._consumer.start()
+            logger.info(
+                f"Kafka consumer started: {self.bootstrap_servers} "
+                f"topic={self.topic} group={settings.kafka_consumer_group}"
+            )
+        except Exception:
+            logger.error(f"Failed to start Kafka consumer:\n{traceback.format_exc()}")
+            raise
 
     async def stop(self):
         if self._consumer:
-            await self._consumer.stop()
-            self._consumer = None
-            logger.info("Kafka consumer stopped")
+            try:
+                await self._consumer.stop()
+            except Exception:
+                logger.error(
+                    f"Error stopping Kafka consumer:\n{traceback.format_exc()}"
+                )
+            finally:
+                self._consumer = None
+                logger.info("Kafka consumer stopped")
 
     async def _process_event(self, event: ClickEvent) -> None:
         """Ingest and process a single event through the full pipeline."""
@@ -69,9 +80,10 @@ class ClickstreamConsumer:
                     f"intent={dispatch.intent} "
                     f"confidence={dispatch.confidence:.2f}"
                 )
-            except Exception as e:
+            except Exception:
                 logger.error(
-                    f"Pipeline failed for event {event.event_id}: {e}"
+                    f"Pipeline failed for event {event.event_id}:\n"
+                    f"{traceback.format_exc()}"
                 )
 
     async def _drain_tasks(self, timeout: float = 2.0) -> None:
@@ -102,8 +114,8 @@ class ClickstreamConsumer:
             try:
                 event = ClickEvent(**msg.value)
                 await callback(event)
-            except Exception as e:
-                logger.error(f"Failed to process message: {e}")
+            except Exception:
+                logger.error(f"Failed to process message:\n{traceback.format_exc()}")
 
     async def run(self) -> None:
         """
@@ -128,6 +140,8 @@ class ClickstreamConsumer:
 
         except asyncio.CancelledError:
             logger.info("Consumer run loop cancelled, shutting down...")
+        except Exception:
+            logger.error(f"Consumer run loop failed:\n{traceback.format_exc()}")
         finally:
             try:
                 await self._drain_tasks()

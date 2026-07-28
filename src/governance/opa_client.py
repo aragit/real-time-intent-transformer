@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from datetime import datetime
 import httpx
 from loguru import logger
 
@@ -10,6 +12,11 @@ _http_client: httpx.AsyncClient | None = None
 
 HIGH_RISK_ACTIONS = frozenset({"ISSUE_DISCOUNT", "APPLY_DISCOUNT", "REFUND", "CHARGEBACK"})
 
+def _json_serialize_helper(obj):
+    """Fallback serializer for objects like datetime."""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    return str(obj)
 
 async def _get_shared_client() -> httpx.AsyncClient:
     global _http_client
@@ -46,7 +53,7 @@ class OPAClient:
         Returns True if allowed, False otherwise.
         On connection/timeout errors, defaults to False for high-risk actions (fail-closed).
         """
-        payload = {
+        raw_payload = {
             "input": {
                 "action": action,
                 "intent": intent,
@@ -57,6 +64,11 @@ class OPAClient:
         }
 
         try:
+            # Convert payload using default handler for datetime
+            payload = json.loads(
+                json.dumps(raw_payload, default=_json_serialize_helper)
+            )
+
             client = await _get_shared_client()
             response = await client.post(self._eval_url, json=payload)
             response.raise_for_status()
