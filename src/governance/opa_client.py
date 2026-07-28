@@ -4,9 +4,9 @@ import json
 from datetime import datetime
 
 import httpx
+from langfuse.decorators import observe
 from loguru import logger
 
-from langfuse.decorators import observe
 from src.config import settings
 
 HIGH_RISK_ACTIONS = frozenset({"ISSUE_DISCOUNT", "APPLY_DISCOUNT", "REFUND", "CHARGEBACK"})

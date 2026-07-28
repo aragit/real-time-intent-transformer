@@ -37,7 +37,7 @@ def _strip_v1_suffix(url: str) -> str:
     path = parsed.path.rstrip("/")
     if path.endswith("/v1"):
         path = path[:-3]
-    return urlunsplit(parsed._replace(path=path))
+    return urlunsplit((parsed.scheme, parsed.netloc, path, parsed.query, parsed.fragment))
 
 
 def _get_llm():
@@ -49,7 +49,7 @@ def _get_llm():
 
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=DeprecationWarning)
-                from langchain_community.chat_models import ChatOllama
+                from langchain_ollama import ChatOllama
 
             _llm = ChatOllama(
                 model=settings.llm_model,

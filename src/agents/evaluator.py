@@ -20,9 +20,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Optional
 
 import asyncpg
+from langfuse.decorators import observe
 from loguru import logger
 
-from langfuse.decorators import observe
 from src.agents.planner import _extract_first_json
 from src.config import settings
 
@@ -66,7 +66,7 @@ def _get_llm():
 
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=DeprecationWarning)
-                from langchain_community.chat_models import ChatOllama
+                from langchain_ollama import ChatOllama
 
             _llm = ChatOllama(
                 model=settings.llm_model,

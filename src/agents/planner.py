@@ -10,9 +10,10 @@ The planner is invoked when System 1 confidence is below the threshold,
 indicating the ML ensemble cannot confidently classify the intent.
 """
 
+import asyncio
 import json
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import BaseTool
 from loguru import logger
@@ -52,7 +53,9 @@ def _extract_first_json(text: str) -> str | None:
 
 # Lazy-initialized LLM
 _llm = None
-_planner = None
+
+PLANNER_TIMEOUT_SECONDS = 30.0
+MAX_TOOL_ROUNDS = 5
 
 
 def _strip_v1_suffix(url: str) -> str:
@@ -63,7 +66,7 @@ def _strip_v1_suffix(url: str) -> str:
     path = parsed.path.rstrip("/")
     if path.endswith("/v1"):
         path = path[:-3]
-    return urlunsplit(parsed._replace(path=path))
+    return urlunsplit((parsed.scheme, parsed.netloc, path, parsed.query, parsed.fragment))
 
 
 PLANNER_SYSTEM_PROMPT = """You are an e-commerce intent resolver and customer intervention planner.
@@ -121,7 +124,7 @@ def _get_llm():
 
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=DeprecationWarning)
-                from langchain_community.chat_models import ChatOllama
+                from langchain_ollama import ChatOllama
 
             _llm = ChatOllama(
                 model=settings.llm_model,
@@ -139,25 +142,6 @@ def _get_llm():
             )
         logger.info(f"LLM initialized: {settings.llm_provider}/{settings.llm_model}")
     return _llm
-
-
-def _get_planner():
-    """Get or create the agent executor."""
-    global _planner
-    if _planner is None:
-        from langchain.agents import AgentExecutor, create_tool_calling_agent
-
-        llm = _get_llm()
-        agent = create_tool_calling_agent(llm, PLANNER_TOOLS, PLANNER_PROMPT)
-        _planner = AgentExecutor(
-            agent=agent,
-            tools=PLANNER_TOOLS,
-            verbose=settings.debug,
-            handle_parsing_errors=True,
-            max_iterations=5,
-        )
-        logger.info("Planner agent initialized")
-    return _planner
 
 
 def build_planner_input(
@@ -240,17 +224,43 @@ async def run_planner(
     )
 
     try:
-        planner = _get_planner()
-        # Run in thread pool since AgentExecutor is sync
-        import asyncio
+        llm = _get_llm()
+        llm_with_tools = llm.bind_tools(PLANNER_TOOLS)
 
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            None,
-            lambda: planner.invoke({"input": planner_input, "chat_history": []}),
+        messages = PLANNER_PROMPT.format_messages(
+            chat_history=[],
+            input=planner_input,
         )
 
-        output = result.get("output", "")
+        response = await asyncio.wait_for(
+            llm_with_tools.ainvoke(messages),
+            timeout=PLANNER_TIMEOUT_SECONDS,
+        )
+
+        for _ in range(MAX_TOOL_ROUNDS):
+            if not response.tool_calls:
+                break
+
+            messages.append(response)
+
+            for tool_call in response.tool_calls:
+                tool_name = tool_call["name"]
+                tool = next((t for t in PLANNER_TOOLS if t.name == tool_name), None)
+                if tool:
+                    result = await tool.ainvoke(tool_call["args"])
+                    messages.append(
+                        ToolMessage(
+                            content=str(result),
+                            tool_call_id=tool_call["id"],
+                        )
+                    )
+
+            response = await asyncio.wait_for(
+                llm_with_tools.ainvoke(messages),
+                timeout=PLANNER_TIMEOUT_SECONDS,
+            )
+
+        output = response.content if hasattr(response, "content") else str(response)
 
         # Try to parse JSON from the LLM output
         try:
@@ -305,10 +315,9 @@ async def run_planner(
 
 async def close_planner():
     """Clean up planner resources."""
-    global _llm, _planner
+    global _llm
     from src.agents.tools.graph_retriever import close_driver
 
     await close_driver()
     _llm = None
-    _planner = None
     logger.info("Planner agent closed")

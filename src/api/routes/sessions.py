@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
-
 from langfuse.decorators import observe
+
 from src.memory import get_event_store
 from src.models.features import SessionFeatures
 from src.models.intent import IntentPrediction

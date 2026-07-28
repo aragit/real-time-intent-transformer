@@ -12,7 +12,7 @@ Verifies that:
 """
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -152,6 +152,17 @@ class TestSystemPrompt:
 # ---------------------------------------------------------------------------
 
 
+def _make_mock_llm(output: str) -> MagicMock:
+    """Create a mock LLM that returns the given output (no tool calls)."""
+    mock_llm = MagicMock()
+    mock_response = MagicMock()
+    mock_response.content = output
+    mock_response.tool_calls = []
+    mock_llm.bind_tools.return_value = mock_llm
+    mock_llm.ainvoke = AsyncMock(return_value=mock_response)
+    return mock_llm
+
+
 class TestRunPlanner:
     @pytest.mark.asyncio
     async def test_successful_json_parse(self):
@@ -165,10 +176,9 @@ class TestRunPlanner:
             }
         )
 
-        mock_executor = MagicMock()
-        mock_executor.invoke.return_value = {"output": mock_output}
+        mock_llm = _make_mock_llm(mock_output)
 
-        with patch("src.agents.planner._get_planner", return_value=mock_executor):
+        with patch("src.agents.planner._get_llm", return_value=mock_llm):
             result = await run_planner(
                 session_id="sess_json",
                 customer_id="cust_001",
@@ -203,10 +213,9 @@ class TestRunPlanner:
 
 I recommend creating urgency."""
 
-        mock_executor = MagicMock()
-        mock_executor.invoke.return_value = {"output": mock_output}
+        mock_llm = _make_mock_llm(mock_output)
 
-        with patch("src.agents.planner._get_planner", return_value=mock_executor):
+        with patch("src.agents.planner._get_llm", return_value=mock_llm):
             result = await run_planner(
                 session_id="sess_md",
                 customer_id="cust_002",
@@ -223,10 +232,9 @@ I recommend creating urgency."""
     async def test_plain_text_fallback_bundle(self):
         mock_output = "Based on the analysis, I recommend OFFER_BUNDLE to this customer."
 
-        mock_executor = MagicMock()
-        mock_executor.invoke.return_value = {"output": mock_output}
+        mock_llm = _make_mock_llm(mock_output)
 
-        with patch("src.agents.planner._get_planner", return_value=mock_executor):
+        with patch("src.agents.planner._get_llm", return_value=mock_llm):
             result = await run_planner(
                 session_id="sess_fallback",
                 customer_id="cust_003",
@@ -243,10 +251,9 @@ I recommend creating urgency."""
     async def test_plain_text_fallback_no_action(self):
         mock_output = "The customer seems to be browsing normally. No intervention needed."
 
-        mock_executor = MagicMock()
-        mock_executor.invoke.return_value = {"output": mock_output}
+        mock_llm = _make_mock_llm(mock_output)
 
-        with patch("src.agents.planner._get_planner", return_value=mock_executor):
+        with patch("src.agents.planner._get_llm", return_value=mock_llm):
             result = await run_planner(
                 session_id="sess_noaction",
                 customer_id="cust_004",
@@ -260,10 +267,11 @@ I recommend creating urgency."""
 
     @pytest.mark.asyncio
     async def test_llm_timeout_returns_error(self):
-        mock_executor = MagicMock()
-        mock_executor.invoke.side_effect = TimeoutError("LLM request timed out")
+        mock_llm = MagicMock()
+        mock_llm.bind_tools.return_value = mock_llm
+        mock_llm.ainvoke = AsyncMock(side_effect=TimeoutError("LLM request timed out"))
 
-        with patch("src.agents.planner._get_planner", return_value=mock_executor):
+        with patch("src.agents.planner._get_llm", return_value=mock_llm):
             result = await run_planner(
                 session_id="sess_timeout",
                 customer_id="cust_005",
@@ -280,10 +288,11 @@ I recommend creating urgency."""
 
     @pytest.mark.asyncio
     async def test_llm_connection_error_returns_error(self):
-        mock_executor = MagicMock()
-        mock_executor.invoke.side_effect = ConnectionError("Cannot reach Ollama server")
+        mock_llm = MagicMock()
+        mock_llm.bind_tools.return_value = mock_llm
+        mock_llm.ainvoke = AsyncMock(side_effect=ConnectionError("Cannot reach Ollama server"))
 
-        with patch("src.agents.planner._get_planner", return_value=mock_executor):
+        with patch("src.agents.planner._get_llm", return_value=mock_llm):
             result = await run_planner(
                 session_id="sess_conn_err",
                 customer_id="cust_006",
@@ -299,10 +308,9 @@ I recommend creating urgency."""
 
     @pytest.mark.asyncio
     async def test_empty_output_returns_no_action(self):
-        mock_executor = MagicMock()
-        mock_executor.invoke.return_value = {"output": ""}
+        mock_llm = _make_mock_llm("")
 
-        with patch("src.agents.planner._get_planner", return_value=mock_executor):
+        with patch("src.agents.planner._get_llm", return_value=mock_llm):
             result = await run_planner(
                 session_id="sess_empty",
                 customer_id=None,
@@ -319,10 +327,9 @@ I recommend creating urgency."""
     async def test_malformed_json_falls_back_to_text(self):
         mock_output = '{"action": "OFFER_BUNDLE" incomplete json...'
 
-        mock_executor = MagicMock()
-        mock_executor.invoke.return_value = {"output": mock_output}
+        mock_llm = _make_mock_llm(mock_output)
 
-        with patch("src.agents.planner._get_planner", return_value=mock_executor):
+        with patch("src.agents.planner._get_llm", return_value=mock_llm):
             result = await run_planner(
                 session_id="sess_malformed",
                 customer_id="cust_007",
@@ -339,10 +346,9 @@ I recommend creating urgency."""
     async def test_send_to_human_detected(self):
         mock_output = "This case is too complex. I recommend SEND_TO_HUMAN for manual review."
 
-        mock_executor = MagicMock()
-        mock_executor.invoke.return_value = {"output": mock_output}
+        mock_llm = _make_mock_llm(mock_output)
 
-        with patch("src.agents.planner._get_planner", return_value=mock_executor):
+        with patch("src.agents.planner._get_llm", return_value=mock_llm):
             result = await run_planner(
                 session_id="sess_human",
                 customer_id="cust_008",

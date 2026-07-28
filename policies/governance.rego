@@ -2,30 +2,60 @@ package governance
 
 default allow = false
 
-# Rule 3 (Safe Actions): Explicitly allow harmless analytical actions
-allow if {
-    input.action == "LOG_ANALYTICS"
+# Safe analytical actions — always allowed
+allow { input.action == "LOG_ANALYTICS" }
+allow { input.action == "RECOMMEND_PRODUCT" }
+
+# Discount rules
+allow {
+    not deny
+    input.action == "APPLY_DISCOUNT"
+    input.customer.discounts_this_month < 3
+    input.customer.total_purchases > 0
+    input.features.total_cart_value > 50
 }
 
-allow if {
-    input.action == "RECOMMEND_PRODUCT"
+allow {
+    not deny
+    input.action == "ISSUE_DISCOUNT"
+    input.discount_value <= 20
+    input.intent != "BROWSING"
 }
 
-# Rule 1 (Hard Limit): Deny any ISSUE_DISCOUNT where discount_value > 20%
-deny if {
+# Urgency rules
+allow {
+    not deny
+    input.action == "SHOW_URGENCY"
+    input.features.inventory_level < 10
+    input.features.intent == "CHECKOUT_INTENT"
+}
+
+# Abandon email rules
+allow {
+    not deny
+    input.action == "SEND_ABANDON_EMAIL"
+    input.features.session_duration_sec > 300
+    input.features.cart_adds > 0
+    input.features.checkouts == 0
+}
+
+# Deny rules — hard limits
+deny {
+    input.action == "APPLY_DISCOUNT"
+    input.customer.last_discount_within_hours < 24
+}
+
+deny {
+    input.action == "APPLY_DISCOUNT"
+    input.customer.demographic_segment != input.features.demographic_segment
+}
+
+deny {
     input.action == "ISSUE_DISCOUNT"
     input.discount_value > 20
 }
 
-# Rule 2 (Intent Guard): Deny ISSUE_DISCOUNT if intent is BROWSING
-deny if {
+deny {
     input.action == "ISSUE_DISCOUNT"
     input.intent == "BROWSING"
-}
-
-# Allow ISSUE_DISCOUNT only when discount <= 20% AND intent is not BROWSING
-allow if {
-    input.action == "ISSUE_DISCOUNT"
-    input.discount_value <= 20
-    input.intent != "BROWSING"
 }

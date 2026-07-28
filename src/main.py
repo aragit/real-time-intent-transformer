@@ -1,3 +1,16 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Explicitly export Langfuse keys so @observe decorators see them at import time
+if os.getenv("LANGFUSE_PUBLIC_KEY"):
+    os.environ["LANGFUSE_PUBLIC_KEY"] = os.getenv("LANGFUSE_PUBLIC_KEY")
+if os.getenv("LANGFUSE_SECRET_KEY"):
+    os.environ["LANGFUSE_SECRET_KEY"] = os.getenv("LANGFUSE_SECRET_KEY")
+if os.getenv("LANGFUSE_HOST"):
+    os.environ["LANGFUSE_HOST"] = os.getenv("LANGFUSE_HOST")
+
 import asyncio
 import time
 from contextlib import asynccontextmanager
