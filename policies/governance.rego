@@ -2,14 +2,27 @@ package governance
 
 default allow = false
 
-# Safe analytical actions — always allowed
+# Safe actions — always allowed
+allow { input.action == "NO_ACTION" }
 allow { input.action == "LOG_ANALYTICS" }
 allow { input.action == "RECOMMEND_PRODUCT" }
+allow { input.action == "OFFER_BUNDLE" }
+allow { input.action == "SEND_TO_HUMAN" }
+allow { input.action == "LOYALTY_REWARD" }
+allow { input.action == "RECOMMEND_ALTERNATIVE" }
 
-# Discount rules
+# Discount rules (APPLY_DISCOUNT and OFFER_DISCOUNT are synced)
 allow {
     not deny
     input.action == "APPLY_DISCOUNT"
+    input.customer.discounts_this_month < 3
+    input.customer.total_purchases > 0
+    input.features.total_cart_value > 50
+}
+
+allow {
+    not deny
+    input.action == "OFFER_DISCOUNT"
     input.customer.discounts_this_month < 3
     input.customer.total_purchases > 0
     input.features.total_cart_value > 50
@@ -46,7 +59,17 @@ deny {
 }
 
 deny {
+    input.action == "OFFER_DISCOUNT"
+    input.customer.last_discount_within_hours < 24
+}
+
+deny {
     input.action == "APPLY_DISCOUNT"
+    input.customer.demographic_segment != input.features.demographic_segment
+}
+
+deny {
+    input.action == "OFFER_DISCOUNT"
     input.customer.demographic_segment != input.features.demographic_segment
 }
 

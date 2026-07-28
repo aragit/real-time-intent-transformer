@@ -54,7 +54,7 @@ def _extract_first_json(text: str) -> str | None:
 # Lazy-initialized LLM
 _llm = None
 
-PLANNER_TIMEOUT_SECONDS = 30.0
+PLANNER_TIMEOUT_SECONDS = 120.0
 MAX_TOOL_ROUNDS = 5
 
 

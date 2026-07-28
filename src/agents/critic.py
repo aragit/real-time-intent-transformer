@@ -22,7 +22,7 @@ from src.agents.planner import _extract_first_json
 from src.config import settings
 from src.governance.opa_client import OPAClient
 
-CRITIC_LLM_TIMEOUT_SECONDS = 15.0
+CRITIC_LLM_TIMEOUT_SECONDS = 60.0
 
 
 # Lazy-initialized LLM for fallback rewriting
