@@ -1,10 +1,6 @@
 <h1 align="center">Real-Time Intent Transformer</h1>
 
 <p align="center">
-  <img src="assets/ban.png" alt="Real-Time Intent Transformer" width="100%">
-</p>
-
-<p align="center">
   <b>A production-grade, dual-path e-commerce intent classification system with deterministic fast-path (System 1), LangGraph agentic reasoning (System 2), OPA governance, background meta-cognition, and end-to-end observability.</b>
 </p>
 
