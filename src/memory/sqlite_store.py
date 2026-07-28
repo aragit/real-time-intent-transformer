@@ -1,3 +1,4 @@
+import asyncio
 import json
 import sqlite3
 from datetime import UTC, datetime, timedelta
@@ -32,46 +33,59 @@ class SQLiteSessionStore(BaseSessionStore):
     async def upsert(self, session_id: str, customer_id: str | None, ttl_hours: int = 24) -> None:
         now = datetime.now(UTC)
         expires = now + timedelta(hours=ttl_hours)
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                """
-                INSERT INTO sessions (session_id, customer_id, created_at, last_activity, expires_at)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(session_id) DO UPDATE SET
-                    last_activity = excluded.last_activity,
-                    expires_at = excluded.expires_at
-                """,
-                (session_id, customer_id, now.isoformat(), now.isoformat(), expires.isoformat()),
-            )
-            conn.commit()
+
+        def _sync_upsert():
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute(
+                    """
+                    INSERT INTO sessions (session_id, customer_id, created_at, last_activity, expires_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(session_id) DO UPDATE SET
+                        last_activity = excluded.last_activity,
+                        expires_at = excluded.expires_at
+                    """,
+                    (session_id, customer_id, now.isoformat(), now.isoformat(), expires.isoformat()),
+                )
+                conn.commit()
+
+        await asyncio.to_thread(_sync_upsert)
 
     async def get(self, session_id: str) -> dict | None:
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            row = conn.execute(
-                "SELECT * FROM sessions WHERE session_id = ?", (session_id,)
-            ).fetchone()
-            if not row:
-                return None
-            session = dict(row)
-            if datetime.fromisoformat(session["expires_at"]) < datetime.now(UTC):
-                await self._delete(session_id)
-                return None
-            return session
+        def _sync_get() -> dict | None:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                row = conn.execute(
+                    "SELECT * FROM sessions WHERE session_id = ?", (session_id,)
+                ).fetchone()
+                if not row:
+                    return None
+                return dict(row)
+
+        session = await asyncio.to_thread(_sync_get)
+        if session and datetime.fromisoformat(session["expires_at"]) < datetime.now(UTC):
+            await self._delete(session_id)
+            return None
+        return session
 
     async def _delete(self, session_id: str) -> None:
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
-            conn.commit()
+        def _sync_delete():
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+                conn.commit()
+
+        await asyncio.to_thread(_sync_delete)
 
     async def delete_expired(self) -> int:
-        with sqlite3.connect(self.db_path) as conn:
-            cur = conn.execute(
-                "DELETE FROM sessions WHERE expires_at < ?",
-                (datetime.now(UTC).isoformat(),),
-            )
-            conn.commit()
-            return cur.rowcount
+        def _sync_delete_expired() -> int:
+            with sqlite3.connect(self.db_path) as conn:
+                cur = conn.execute(
+                    "DELETE FROM sessions WHERE expires_at < ?",
+                    (datetime.now(UTC).isoformat(),),
+                )
+                conn.commit()
+                return cur.rowcount
+
+        return await asyncio.to_thread(_sync_delete_expired)
 
     async def close(self) -> None:
         pass
@@ -106,35 +120,41 @@ class SQLiteEventStore(BaseEventStore):
         logger.info(f"SQLiteEventStore initialized: {self.db_path}")
 
     async def insert(self, event: ClickEvent) -> None:
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO events
-                (event_id, session_id, customer_id, timestamp, action, product_id, category, value, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    event.event_id,
-                    event.session_id,
-                    event.customer_id,
-                    event.timestamp.isoformat(),
-                    event.action,
-                    event.product_id,
-                    event.category,
-                    event.value,
-                    json.dumps(event.metadata) if event.metadata else "{}",
-                ),
-            )
-            conn.commit()
+        def _sync_insert():
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO events
+                    (event_id, session_id, customer_id, timestamp, action, product_id, category, value, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        event.event_id,
+                        event.session_id,
+                        event.customer_id,
+                        event.timestamp.isoformat(),
+                        event.action,
+                        event.product_id,
+                        event.category,
+                        event.value,
+                        json.dumps(event.metadata) if event.metadata else "{}",
+                    ),
+                )
+                conn.commit()
+
+        await asyncio.to_thread(_sync_insert)
 
     async def get_session_events(self, session_id: str) -> list[ClickEvent]:
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                "SELECT * FROM events WHERE session_id = ? ORDER BY timestamp",
-                (session_id,),
-            ).fetchall()
-            return [self._row_to_event(dict(row)) for row in rows]
+        def _sync_get_events() -> list[ClickEvent]:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    "SELECT * FROM events WHERE session_id = ? ORDER BY timestamp",
+                    (session_id,),
+                ).fetchall()
+                return [self._row_to_event(dict(row)) for row in rows]
+
+        return await asyncio.to_thread(_sync_get_events)
 
     def _row_to_event(self, row: dict) -> ClickEvent:
         return ClickEvent(
@@ -152,10 +172,14 @@ class SQLiteEventStore(BaseEventStore):
     async def delete_expired_events(self, ttl_hours: int = 24) -> int:
         """Prune events older than ttl_hours to prevent unbounded table growth."""
         cutoff = (datetime.now(UTC) - timedelta(hours=ttl_hours)).isoformat()
-        with sqlite3.connect(self.db_path) as conn:
-            cur = conn.execute("DELETE FROM events WHERE timestamp < ?", (cutoff,))
-            conn.commit()
-            return cur.rowcount
+
+        def _sync_delete_expired() -> int:
+            with sqlite3.connect(self.db_path) as conn:
+                cur = conn.execute("DELETE FROM events WHERE timestamp < ?", (cutoff,))
+                conn.commit()
+                return cur.rowcount
+
+        return await asyncio.to_thread(_sync_delete_expired)
 
     async def close(self) -> None:
         pass

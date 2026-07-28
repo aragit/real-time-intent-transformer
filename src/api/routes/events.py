@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Body, status
 
 from src.models.events import ClickEvent
 from src.pipeline import ingest_event
@@ -14,7 +14,7 @@ async def ingest_event_endpoint(event: ClickEvent):
 
 
 @router.post("/events/ingest/batch", status_code=status.HTTP_202_ACCEPTED)
-async def ingest_batch(events: list[ClickEvent]):
+async def ingest_batch(events: list[ClickEvent] = Body(..., max_length=1000)):
     """Ingest a batch of click events into async memory stores."""
     import asyncio
 

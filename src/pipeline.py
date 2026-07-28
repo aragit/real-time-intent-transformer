@@ -184,7 +184,7 @@ async def process_event(event: ClickEvent) -> ActionDispatch:
             reason=reason,
         )
     else:
-        dispatch = ActionDispatcher().dispatch(
+        dispatch = _get_dispatcher().dispatch(
             session_id=session_id,
             intent=intent,
             confidence=confidence,

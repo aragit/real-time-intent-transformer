@@ -232,12 +232,19 @@ class EvaluatorAgent:
         session_id: str,
         action_time: datetime,
         window_minutes: int = 15,
-    ) -> bool:
+    ) -> bool | None:
         """
         Check if a checkout occurred within the window after the action.
 
-        Queries the local SQLite event store (sync) via thread pool.
+        Returns True if converted, False if not converted, None if the
+        observation window has not yet elapsed (action too recent to evaluate).
         """
+        now = datetime.now(UTC)
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=UTC)
+        buffer_minutes = 5
+        if (now - action_time) <= timedelta(minutes=window_minutes + buffer_minutes):
+            return None
 
         def _sync_check() -> bool:
             import sqlite3
@@ -398,7 +405,9 @@ class EvaluatorAgent:
 
             is_converted = await self._check_conversion(session_id, action_time)
 
-            if is_converted:
+            if is_converted is None:
+                continue
+            elif is_converted:
                 converted += 1
             else:
                 # Collect failed action details for LLM analysis
