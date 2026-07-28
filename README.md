@@ -543,6 +543,70 @@ pytest tests/test_latency_benchmark.py -v
 
 ---
 
+## References
+
+### Cognitive Architecture & System Design
+
+**"Thinking, Fast and Slow" by Daniel Kahneman (2011)**
+
+- **The Concept:** The psychological foundation for System 1 (fast, automatic) and System 2 (slow, deliberate) reasoning.
+- **How it applies:** This is the theoretical basis for your dual-path routing (ML Ensemble vs. LangGraph Orchestrator).
+
+**"Neuro-Symbolic Artificial Intelligence: The State of the Art" (Garcez & Lamb, 2023)**
+
+- **The Concept:** The integration of neural learning (pattern recognition) with symbolic reasoning (logic and rules).
+- **How it applies:** Validates your approach of combining probabilistic Random Forests/LLMs with deterministic OPA rules and hard-coded suppression logic.
+
+### Agentic Reasoning & Tool Use
+
+**"ReAct: Synergizing Reasoning and Acting in Language Models" (Yao et al., 2022)**
+
+- **The Concept:** The foundational paper on prompting LLMs to generate reasoning traces alongside task-specific actions.
+- **How it applies:** Justifies your Planner agent's step-by-step logic before deciding to execute a tool.
+
+**"CRITIC: Large Language Models Can Self-Correct with Tool-Interactive Critiquing" (Gou et al., 2023)**
+
+- **The Concept:** Using a secondary LLM state to evaluate, critique, and revise the outputs of a primary planner using external tools.
+- **How it applies:** Maps perfectly to your Critic agent validating the Planner's proposed actions.
+
+### Memory & Graph Retrieval
+
+**"From Local to Global: A Graph RAG Approach to Query-Focused Summarization" (Edge et al., Microsoft, 2024)**
+
+- **The Concept:** Enhancing standard retrieval by using knowledge graphs to preserve the relational context of information.
+- **How it applies:** The SOTA reference for your GraphRAG implementation used in complex, ambiguous session escalation.
+
+**"Reflexion: Language Agents with Verbal Reinforcement Learning" (Shinn et al., 2023)**
+
+- **The Concept:** Equipping agents with dynamic memory and self-reflection to improve decision-making over time without weight fine-tuning.
+- **How it applies:** Supports your background meta-cognitive Evaluator that monitors drift and tracks action efficacy over time.
+
+### Real-Time Processing & Governance
+
+**"Real-time Personalization using Embeddings for Search Ranking at Airbnb" (Grbovic & Cheng, KDD 2018)**
+
+- **The Concept:** A landmark paper on applying high-throughput stream processing to classify user intent in real-time e-commerce environments.
+- **How it applies:** Provides industry validation for your sub-50ms CPU fast-path ML ensemble.
+
+**Open Policy Agent (OPA) Cloud Native Computing Foundation (CNCF) Documentation**
+
+- **The Concept:** Decoupling policy decision-making from application logic using Rego.
+- **How it applies:** The authoritative reference for your governance sandbox and fail-closed enterprise security.
+
+**"NeMo Guardrails: A Toolkit for Controllable and Safe LLM Applications" (NVIDIA, 2023)**
+
+- **The Concept:** Open-source architectures for adding programmable rails to LLM outputs.
+- **How it applies:** Complements the OPA sandbox by showing the industry standard for intercepting and managing rogue AI outputs before execution.
+
+### Multi-Agent Orchestration
+
+**"LangGraph: Multi-Agent Workflows" (LangChain Team Documentation)**
+
+- **The Concept:** Modeling agentic loops as cyclical graphs (nodes and edges) rather than linear chains to allow for stateful, cyclic reasoning.
+- **How it applies:** The direct architectural reference for your state-driven Orchestrator, Planner, and Critic pipeline.
+
+---
+
 ## Citation
 
 If you use this software in your research or product, please cite it. Click the **"Cite this repository"** button on the GitHub sidebar, or use:
