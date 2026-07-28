@@ -19,13 +19,26 @@
 
 ## What Problem Does This Solve?
 
-E-commerce platforms lose revenue because they treat all users the same. A user browsing 20 pages without adding to cart needs a different intervention than one with a full cart who started checkout.
+Traditional personalization engines optimize for conversion at the expense of profit margin. A standard predictive model (like XGBoost) can easily detect when a user is about to abandon a $2,000 cart and reflexively fire a 10% discount. It drives the sale, but it is a blunt instrument—it lacks the semantic context to know if the user was actually price-sensitive, or if they were just confused about a product feature and needed a comparison guide.
 
-**Real-Time Intent Transformer** classifies live shopping sessions into 7 intent categories and dispenses targeted actions (discounts, urgency, abandon recovery) within **50ms on CPU** — with zero external API dependencies for the hot path.
+The Real-Time Intent Transformer solves this by bridging the gap between fast, probabilistic machine learning and deep, contextual AI reasoning. It is a closed-loop, neuro-symbolic intelligence engine that protects both conversion rates and profit margins.
+
+### The Core Mechanics
+
+Instead of reacting to raw metrics, the engine translates behavior into strategy:
+
+- **The Intent (What We Classify):** We aren't just looking at clicks. The engine classifies complex psychological states in real time: Price Sensitive, Comparing Features, High Conviction, Hesitant, or Churn Risk.
+- **The Action (What Runs):** Based on that classified intent, the engine dispatches a targeted intervention from a predefined action space. If the intent is Price Sensitive, the action is `APPLY_DISCOUNT`. If the intent is Comparing Features, the action is `SHOW_COMPARISON_TOOL`.
+- **The Engine (The Decision Matrix):** Interventions are never fired blindly. Every execution runs based on the mathematical fusion of live streaming features (page views, cart adds), historical memory (past purchases, discount abuse), and strict Open Policy Agent (OPA) governance rules that dictate exactly what is legally and financially permissible.
 
 > **"Perceive → Reason → Govern → Execute → Learn"**
 
-Every clickstream event flows through a dual-path neuro-symbolic pipeline. The fast path handles deterministic cases in <50ms. Complex or ambiguous sessions escalate to an LLM-powered agentic path with GraphRAG retrieval, validated by a Critic agent against OPA governance policies. A background meta-cognitive evaluator continuously monitors action efficacy and detects model drift.
+Every clickstream event flows through a mathematically governed, dual-path architecture:
+
+- **System 1 (Fast Perception):** Built for high-throughput stream ingestion. An optimized ML ensemble handles 80% of standard traffic, dispensing deterministic actions (urgency, standard cart recovery) in <50ms on CPU, with zero external API dependencies.
+- **System 2 (Deep Reasoning):** When a session is complex, novel, or ambiguous, the pipeline escalates to an LLM-powered agentic orchestrator. Using Planners, Critics, and GraphRAG retrieval, it reasons through the context of user behavior to protect margins (e.g., dynamically fetching a firmware update article to resolve a user's hesitation, rather than needlessly burning a $200 discount).
+- **Enterprise Governance:** Agents are inherently unpredictable, which is a non-starter for production finance and marketing. Every proposed AI action is forced through an Open Policy Agent (OPA) fail-closed sandbox. The system is physically incapable of executing an intervention that violates predefined business logic or margin constraints.
+- **Action-Aware Learning:** A background meta-cognitive evaluator continuously tracks the cryptographic audit ledger, monitoring the true economic ROI of the engine's decisions and automatically detecting mathematical drift over time.
 
 ---
 
