@@ -40,7 +40,7 @@ class TestFeatureEngineer:
         features = engineer.engineer(events)
         assert features.cart_adds == 1
         assert features.cart_removes == 1
-        assert features.cart_abandon_rate == 0.5  # 1 remove / (1 add + 1) = 0.5
+        assert features.cart_abandon_rate == 1.0  # 1 remove / max(1 add, 1) = 1.0
 
     def test_session_duration(self):
         engineer = FeatureEngineer()
@@ -122,7 +122,7 @@ class TestFeatureEngineer:
             ),
         ]
         features = engineer.engineer(events)
-        assert features.exploration_ratio == 2 / 4  # 2 switches / (3 views + 1)
+        assert features.exploration_ratio == 2 / 3  # 2 switches / max(3 views, 1)
 
     def test_action_sequence_order(self):
         engineer = FeatureEngineer()
@@ -152,7 +152,7 @@ class TestFeatureEngineer:
             ),
         ]
         features = engineer.engineer(events)
-        assert features.checkout_conversion_rate == 1 / 3
+        assert features.checkout_conversion_rate == 1 / 2  # 1 checkout / max(2 cart_adds, 1)
 
     def test_avg_inter_event_time(self):
         engineer = FeatureEngineer()

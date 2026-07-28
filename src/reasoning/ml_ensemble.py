@@ -1,3 +1,4 @@
+import math
 import os
 
 import joblib
@@ -52,6 +53,17 @@ class MLEnsembleClassifier:
         else:
             logger.warning(f"No model found at {path}. Using rule-based fallback.")
 
+    @staticmethod
+    def _sigmoid_calibrate(raw_score: float, a: float = 5.0, b: float = -2.5) -> float:
+        """Platt scaling: map a raw heuristic score to a calibrated [0, 1] probability.
+
+        Uses the parameterized sigmoid  1 / (1 + exp(-(a*x + b))).
+        With default a=5, b=-2.5 the curve is centred at x=0.5 → p=0.5,
+        compressing extreme values toward the tails.
+        """
+        z = -(a * raw_score + b)
+        return 1.0 / (1.0 + math.exp(z))
+
     def _vectorize(self, features: SessionFeatures) -> np.ndarray:
         return np.array([getattr(features, name, 0.0) for name in self.FEATURE_ORDER]).reshape(
             1, -1
@@ -63,6 +75,7 @@ class MLEnsembleClassifier:
         """
         # Try rule-based first
         intent, confidence = self.rule_classifier.classify(features)
+        confidence = self._sigmoid_calibrate(confidence)
         if confidence >= 0.6:
             return intent, confidence, "rule_based"
 

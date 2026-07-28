@@ -55,11 +55,13 @@ class FeatureEngineer:
         minutes = (session_duration_sec / 60.0) + 1.0
         cart_value_per_minute = total_cart_value / minutes
 
-        # Derived
-        cart_conversion_rate = cart_adds / (page_views + 1)
-        checkout_conversion_rate = checkouts / (cart_adds + 1)
-        cart_abandon_rate = cart_removes / (cart_adds + 1) if cart_adds > 0 else 0.0
-        exploration_ratio = max(0.0, min(1.0, category_switches / (page_views + 1)))
+        # Derived — use max() to prevent division by zero without biasing rates downward
+        safe_page_views = max(page_views, 1)
+        safe_cart_adds = max(cart_adds, 1)
+        cart_conversion_rate = cart_adds / safe_page_views
+        checkout_conversion_rate = checkouts / safe_cart_adds
+        cart_abandon_rate = cart_removes / safe_cart_adds if cart_adds > 0 else 0.0
+        exploration_ratio = max(0.0, min(1.0, category_switches / safe_page_views))
 
         action_sequence = df["action"].to_list()
 
