@@ -127,7 +127,7 @@ A persistent background worker periodically:
 | **P0** | ActionDispatcher singleton (suppression works) | ✅ Fixed |
 | **P1** | LangGraph PostgreSQL checkpointing | ✅ Fixed |
 | **P1** | OPA timeout & async fallback (50ms) | ✅ Fixed |
-| **P1** | Defensive timeouts (critic 15s, evaluator 30s, Neo4j 5s) | ✅ Fixed |
+| **P1** | Defensive timeouts (critic 60s, evaluator 30s, planner 120s, Neo4j 5s) | ✅ Fixed |
 | **P1** | LLM concurrency limiter (Semaphore) | ✅ Fixed |
 | **P1** | SQLite async I/O (`asyncio.to_thread`) | ✅ Fixed |
 | **P1** | Orchestrator wired into REST API | ✅ Fixed |
@@ -354,6 +354,23 @@ echo "LANGFUSE_HOST=https://cloud.langfuse.com" >> .env
 
 > **Note:** The test suite automatically disables external telemetry via `LANGFUSE_SDK_DISABLED=true` in `tests/conftest.py` to prevent suite latency or external network dependency failures.
 
+### Langfuse Distributed Tracing
+
+The system emits full traces for every intent prediction, capturing both the fast path and agentic path:
+
+![Langfuse Trace List](docs/images/langfuse-trace-list.png)
+*Trace list showing System 1 and System 2 executions with latency and status*
+
+![Langfuse System 2 Trace](docs/images/langfuse-system2-trace.png)
+*Expanded System 2 trace: route_by_complexity → system_2_agentic_path → critic_node.
+Even LLM failures (red) are captured with full context for debugging.*
+
+Traces include:
+- **Node-level spans** for each LangGraph state transition
+- **LLM generation spans** with token usage and latency
+- **OPA evaluation spans** with policy decisions
+- **Error propagation** when services are unavailable (fail-closed behavior)
+
 ### Prometheus — Operational Metrics
 
 Prometheus metrics are exposed for scraping:
@@ -467,7 +484,7 @@ real-time-intent-transformer/
 │   ├── main.py                  # FastAPI app (CORS + metrics middleware)
 │   └── pipeline.py              # System 1 hot-path pipeline
 ├── policies/
-│   └── ecommerce.rego           # OPA Rego v1 policies (deny guards)
+│   └── governance.rego           # OPA Rego v1 policies (deny guards)
 ├── tests/                       # 261 tests, 100% pass rate
 ├── docker/
 │   └── docker-compose.yml       # Kafka (KRaft) + OPA
