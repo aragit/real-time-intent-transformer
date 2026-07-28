@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+title: "Real-Time Intent Transformer"
+message: "If you use this software, please cite it using the metadata from this file."
+type: software
+authors:
+  - name: "Real-Time Intent Transformer Contributors"
+repository-code: "https://github.com/aragit/real-time-intent-transformer"
+license: MIT
+preferred-citation:
+  type: software
+  title: "Real-Time Intent Transformer: A Dual-Path Neuro-Symbolic Pipeline for E-Commerce Intent Classification"
+  authors:
+    - name: "Real-Time Intent Transformer Contributors"
+  year: 2026
+  url: "https://github.com/aragit/real-time-intent-transformer"
+  repository-code: "https://github.com/aragit/real-time-intent-transformer"

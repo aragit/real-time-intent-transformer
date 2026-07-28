@@ -539,6 +539,24 @@ pytest tests/test_latency_benchmark.py -v
 
 ---
 
+## Citation
+
+If you use this software in your research or product, please cite it. Click the **"Cite this repository"** button on the GitHub sidebar, or use:
+
+```bibtex
+@software{real_time_intent_transformer_2026,
+  author    = {{Real-Time Intent Transformer Contributors}},
+  title     = {{Real-Time Intent Transformer: A Dual-Path Neuro-Symbolic Pipeline for E-Commerce Intent Classification}},
+  year      = {2026},
+  url       = {https://github.com/aragit/real-time-intent-transformer},
+  license   = {MIT}
+}
+```
+
+> **Citation format:** [CITATION.cff](CITATION.cff) (GitHub renders a "Cite this repository" button automatically from this file)
+
+---
+
 ## Contributing
 
 Contributions welcome in:
