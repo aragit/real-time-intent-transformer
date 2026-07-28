@@ -96,7 +96,14 @@ class MockLedger:
 class MockOPAClient:
     """Simulates OPA HTTP call with ~1ms latency."""
 
-    async def evaluate(self, action: str, customer: dict, features: dict) -> bool:
+    async def evaluate(
+        self,
+        action: str,
+        intent: str = "",
+        discount_value: float = 0.0,
+        customer: dict | None = None,
+        features: dict | None = None,
+    ) -> bool:
         await asyncio.sleep(0.001)  # 1ms — realistic for local OPA
         return True
 

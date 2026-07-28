@@ -100,7 +100,9 @@ class PGActionLedger(BaseActionLedger):
                     (action_id, session_id, action_type, intent, confidence,
                      payload, status, created_at)
                 VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
-                ON CONFLICT DO NOTHING
+                ON CONFLICT (action_id) DO UPDATE SET
+                    status = EXCLUDED.status,
+                    payload = EXCLUDED.payload
                 """,
                 *row,
             )

@@ -24,6 +24,7 @@ import asyncpg
 from loguru import logger
 
 from langfuse.decorators import observe
+from src.agents.planner import _extract_first_json
 from src.config import settings
 
 # Lazy-initialized components
@@ -329,9 +330,9 @@ class EvaluatorAgent:
             output = response.content if hasattr(response, "content") else str(response)
 
             # Parse JSON from LLM output
-            match = re.search(r"\{.*\}", output, re.DOTALL)
-            if match:
-                return json.loads(match.group())
+            json_str = _extract_first_json(output)
+            if json_str:
+                return json.loads(json_str)
 
         except Exception as e:
             logger.warning(f"LLM drift analysis failed: {e}")

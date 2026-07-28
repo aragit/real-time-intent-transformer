@@ -19,6 +19,7 @@ import re
 
 from loguru import logger
 
+from src.agents.planner import _extract_first_json
 from src.config import settings
 from src.governance.opa_client import OPAClient
 
@@ -179,9 +180,9 @@ async def run_critic(
         # Parse JSON from LLM output
         import json
 
-        match = re.search(r"\{.*\}", output, re.DOTALL)
-        if match:
-            parsed = json.loads(match.group())
+        json_str = _extract_first_json(output)
+        if json_str:
+            parsed = json.loads(json_str)
             fallback_action = parsed.get("action", "NO_ACTION")
             fallback_reasoning = parsed.get("reasoning", "Critic rewrite")
 

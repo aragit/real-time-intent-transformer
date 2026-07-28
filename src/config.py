@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     vllm_model: str = "google/gemma-3n-E4B-it"
     vllm_api_key: str = "EMPTY"
     vllm_timeout: float = 5.0
+    cors_origins: list[str] = Field(default=["http://localhost:3000"])
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 

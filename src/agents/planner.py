@@ -21,6 +21,36 @@ from loguru import logger
 from src.agents.tools.graph_retriever import get_customer_affinity, query_product_graph
 from src.config import settings
 
+
+def _extract_first_json(text: str) -> str | None:
+    """Extract the first balanced JSON object from text using brace-depth counting."""
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        c = text[i]
+        if escape:
+            escape = False
+            continue
+        if c == "\\":
+            escape = True
+            continue
+        if c == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
 # Lazy-initialized LLM
 _llm = None
 _planner = None
@@ -225,9 +255,9 @@ async def run_planner(
         # Try to parse JSON from the LLM output
         try:
             # Robustly extract JSON block from LLM output (may be wrapped in markdown)
-            match = re.search(r"\{.*\}", output, re.DOTALL)
-            if match:
-                parsed = json.loads(match.group())
+            json_str = _extract_first_json(output)
+            if json_str:
+                parsed = json.loads(json_str)
                 return {
                     "action": parsed.get("action", "NO_ACTION"),
                     "confidence": parsed.get("confidence", 0.5),
