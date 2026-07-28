@@ -5,23 +5,14 @@
 </p>
 
 <p align="center">
-  <b>A production-grade, dual-path e-commerce intent classification system with deterministic fast-path (System 1), LangGraph agentic reasoning (System 2), OPA governance, background meta-cognition, and end-to-end Langfuse observability.</b>
+  <b>A production-grade, dual-path e-commerce intent classification system with deterministic fast-path (System 1), LangGraph agentic reasoning (System 2), OPA governance, background meta-cognition, and end-to-end observability.</b>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.12-blue" alt="Python">
-  <img src="https://img.shields.io/badge/FastAPI-009688" alt="FastAPI">
-  <img src="https://img.shields.io/badge/LangGraph-231F20" alt="LangGraph">
-  <img src="https://img.shields.io/badge/Langfuse-000000" alt="Langfuse">
-  <img src="https://img.shields.io/badge/Polars-CD792C" alt="Polars">
-  <img src="https://img.shields.io/badge/Kafka-231F20" alt="Kafka">
-  <img src="https://img.shields.io/badge/OPA-7D9199" alt="OPA">
-  <img src="https://img.shields.io/badge/scikit--learn-F7931E" alt="scikit-learn">
-  <img src="https://img.shields.io/badge/XGBoost-EB4226" alt="XGBoost">
-  <img src="https://img.shields.io/badge/Pydantic-E92063" alt="Pydantic">
-  <img src="https://img.shields.io/badge/pytest-0A9EDC" alt="pytest">
-  <img src="https://img.shields.io/badge/Docker-2496ED" alt="Docker">
-  <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/tests-261%2F261%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/coverage-71%25-yellowgreen" alt="Coverage">
+  <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
 </p>
 
 ---
@@ -30,9 +21,11 @@
 
 E-commerce platforms lose revenue because they treat all users the same. A user browsing 20 pages without adding to cart needs a different intervention than one with a full cart who started checkout.
 
-**Real-Time Intent Transformer** classifies live shopping sessions into 7 intent categories (BROWSE, COMPARE, CART_BUILDER, CHECKOUT_INTENT, PRICE_SENSITIVE, CHURN_RISK, LOYAL_RETURNER) and dispenses targeted actions (discounts, urgency, abandon recovery) within 50ms on CPU — with zero external API dependencies.
+**Real-Time Intent Transformer** classifies live shopping sessions into 7 intent categories and dispenses targeted actions (discounts, urgency, abandon recovery) within **50ms on CPU** — with zero external API dependencies for the hot path.
 
-> **"Perceive-Reason-Govern-Execute"**: Every clickstream event flows through a dual-path neuro-symbolic pipeline. The fast path handles deterministic cases in <50ms. Complex or ambiguous sessions escalate to an LLM-powered agentic path with GraphRAG retrieval, validated by a Critic agent against OPA governance policies. A background meta-cognitive evaluator continuously monitors action efficacy and detects model drift.
+> **"Perceive → Reason → Govern → Execute → Learn"**
+
+Every clickstream event flows through a dual-path neuro-symbolic pipeline. The fast path handles deterministic cases in <50ms. Complex or ambiguous sessions escalate to an LLM-powered agentic path with GraphRAG retrieval, validated by a Critic agent against OPA governance policies. A background meta-cognitive evaluator continuously monitors action efficacy and detects model drift.
 
 ---
 
@@ -41,202 +34,118 @@ E-commerce platforms lose revenue because they treat all users the same. A user 
 ### Dual-Path Design
 
 ```
-                          ┌─────────────────────────────┐
-                          │     Incoming Click Event     │
-                          └──────────────┬──────────────┘
-                                         │
-                          ┌──────────────▼──────────────┐
-                          │   Complexity Router          │
-                          │   (confidence < threshold    │
-                          │    or complex intent?)       │
-                          └──────┬───────────────┬──────┘
-                                 │               │
-                    ┌────────────▼──┐    ┌───────▼────────────┐
-                    │  System 1     │    │  System 2           │
-                    │  Fast Path    │    │  Agentic Path       │
-                    │  (<50ms)      │    │  (unlimited)        │
-                    │               │    │                     │
-                    │  ML Ensemble  │    │  LLM Planner        │
-                    │  + Rules      │    │  + GraphRAG         │
-                    │  + Markov     │    │  + Critic Agent     │
-                    └───────┬───────┘    └────────┬────────────┘
-                            │                     │
-                            │            ┌────────▼────────────┐
-                            │            │  OPA Critic         │
-                            │            │  (governance gate)  │
-                            │            └────────┬────────────┘
-                            │                     │
-                    ┌───────▼─────────────────────▼──────┐
-                    │       Action Dispatcher             │
-                    │  (suppression + audit ledger)       │
-                    └────────────────┬────────────────────┘
+                      ┌─────────────────────────────┐
+                      │     Incoming Click Event     │
+                      └──────────────┬──────────────┘
                                      │
-                    ┌────────────────▼────────────────────┐
-                    │   Background Meta-Cognitive Evaluator│
-                    │   (drift detection + LLM-as-Judge)  │
-                    └─────────────────────────────────────┘
+                      ┌──────────────▼──────────────┐
+                      │   Complexity Router          │
+                      │   (confidence < threshold    │
+                      │    or complex intent?)       │
+                      └──────┬───────────────┬──────┘
+                             │               │
+                ┌────────────▼──┐    ┌───────▼────────────┐
+                │  System 1     │    │  System 2           │
+                │  Fast Path    │    │  Agentic Path       │
+                │  (<50ms)      │    │  (unlimited)        │
+                │               │    │                     │
+                │  ML Ensemble  │    │  LLM Planner        │
+                │  + Rules      │    │  + GraphRAG         │
+                │  + Markov     │    │  + Critic Agent     │
+                └───────┬───────┘    └────────┬────────────┘
+                        │                     │
+                        │            ┌────────▼────────────┐
+                        │            │  OPA Critic         │
+                        │            │  (governance gate)  │
+                        │            └────────┬────────────┘
+                        │                     │
+                ┌───────▼─────────────────────▼──────┐
+                │       Action Dispatcher             │
+                │  (suppression + audit ledger)       │
+                └────────────────┬────────────────────┘
+                                 │
+                ┌────────────────▼────────────────────┐
+                │   Background Meta-Cognitive Evaluator│
+                │   (drift detection + LLM-as-Judge)  │
+                └─────────────────────────────────────┘
 ```
 
 ### System 1 — Deterministic Fast Path (<50ms)
 
-The fast path processes high-confidence, straightforward intents through a deterministic pipeline:
-
 | Stage | Component | Technology | Latency |
 |-------|-----------|------------|---------|
-| **Ingestion** | Kafka Producer/Consumer | `aiokafka`, FastAPI | Async streaming |
-| **Hydration** | Session + Event Store | SQLite / Redis | <5ms |
-| **Perception** | Feature Engineer | **Polars** | <5ms (15+ behavioral features) |
+| **Ingestion** | REST / Kafka | FastAPI, aiokafka | Async streaming |
+| **Hydration** | Session + Event Store | SQLite / Redis / PostgreSQL | <5ms |
+| **Perception** | Feature Engineer | **Polars** | <5ms (18 behavioral features) |
 | **Reasoning** | ML Ensemble | Rule heuristic + Markov chain + sklearn RF + XGBoost | <10ms rule, <50ms ML |
-| **Governance** | OPA Policy Engine | OPA/Rego + Python fallback | 50ms timeout |
+| **Governance** | OPA Policy Engine | OPA/Rego v1 + Python fallback | 50ms timeout, fail-closed |
 | **Execution** | Action Dispatcher | FastAPI | 6 action types with suppression |
-| **Ledger** | Audit Trail | PostgreSQL / SQLite | Immutable action log |
+| **Ledger** | Audit Trail | PostgreSQL / SQLite | Immutable, ON CONFLICT DO UPDATE for status |
 
 ### System 2 — Agentic Reasoning (LangGraph)
 
-When confidence is below threshold or intent is complex (CHURN_RISK, LOYAL_RETURNER), sessions escalate to the agentic path:
+When confidence is below threshold or intent is complex (`CHURN_RISK`, `LOYAL_RETURNER`), sessions escalate to the agentic path:
 
 1. **LLM Planner** — Proposes an action using session context + GraphRAG product retrieval
 2. **GraphRAG Tools** — Neo4j graph queries for product relationships and customer history
 3. **Critic Agent** — Validates the proposed action against OPA governance policies
    - If OPA allows → approve unchanged
    - If OPA denies → rewrite to compliant fallback via LLM
-   - If rewrite fails → hard NO_ACTION
+   - If rewrite fails → hard `NO_ACTION`
 
-State persistence uses LangGraph checkpointing (PostgresSaver in production, MemorySaver for local dev).
+State persistence uses LangGraph checkpointing (`PostgresSaver` in production, `MemorySaver` for local dev).
 
 ### Background Meta-Cognition
 
 A persistent background worker periodically:
+
 - Fetches recent actions from the PostgreSQL ledger
 - Correlates actions with user conversion events
 - Uses LLM-as-a-Judge to diagnose failed interventions
 - Detects model drift (declining efficacy over time)
 - Persists aggregated metrics to `evaluation_metrics` table
 
-### Governance & Safety
-
-- **OPA/Rego policies** with Python fallback for offline evaluation
-- **Anti-gaming**: No duplicate discounts within 15 minutes; max 3 discounts/month
-- **Fairness guardrails**: No demographic-based pricing discrimination
-- **Action suppression**: Deduplication within configurable time windows
-- **Audit trail**: Immutable ledger of every dispatched action with intent, confidence, and reason
-- **Deterministic idempotency**: SHA-256 keys from `session_id:action:minute_bucket` prevent duplicate actions
-
 ---
 
-## Observability — Langfuse Integration
-
-This engine uses [Langfuse](https://langfuse.com) for real-time observability across both deterministic policy routes and agentic decision flows.
-
-```
-       ┌─────────────────────────────────────────────────────────┐
-       │                   FastAPI / API Route                   │
-       └────────────────────────────┬────────────────────────────┘
-                                    │
-            ┌───────────────────────┴───────────────────────┐
-            ▼                                               ▼
-┌─────────────────────────┐                     ┌─────────────────────────┐
-│       System 1          │                     │        System 2         │
-│  Fast-Path / OPA Policy │                     │  LangGraph Multi-Agent  │
-└───────────┬─────────────┘                     └───────────┬─────────────┘
-            │                                               │
-            ▼                                               ▼
-   [@observe Decorator]                          [Langfuse CallbackHandler]
-   - Latency tracking (<15ms)                    - Node-by-node state spans
-   - Fallback evaluations                        - Graph state inputs/outputs
-            │                                               │
-            └───────────────────────┬───────────────────────┘
-                                    │
-                                    ▼
-                      ┌───────────────────────────┐
-                      │      Langfuse Cloud       │
-                      │  Tracing & Analytics UI   │
-                      └───────────────────────────┘
-
-```
-End-to-end distributed tracing operates with zero-config setup across the stack:
-
-
-| Component | Tracing | What's Captured |
-|-----------|---------|-----------------|
-| **OPA Client** | `@observe()` decorator | Evaluation latency, fallback path, allow/deny decisions |
-| **Classify Endpoint** | `@observe()` decorator | Full request lifecycle for intent prediction |
-| **LangGraph Orchestrator** | `CallbackHandler` | Planner, GraphRAG tools, Critic agent as nested spans |
-| **Evaluator Agent** | `@observe()` decorator | Background batch traces, LLM analysis spans |
-
-**Key Tracing Capabilities**
-
-- System 1 (Fast-Path Latency): Tracks deterministic policy evaluations via @observe() decorators to ensure compliance checks remain under target thresholds (<= 15ms).
-
-- System 2 (LangGraph Execution): Injects a native CallbackHandler into graph invocations (graph.ainvoke), capturing nested node execution trees (__start__ -> route_by_complexity -> system_1_fast_path -> __end__), along with input feature flags and output routing decisions.
-
-- Meta-Cognition Evaluators: Records background drift detection runs and batch confidence scores into decoupled trace scopes.
-
-
-
-### Configuration
-
-Add to your `.env`:
-
-```bash
-LANGFUSE_PUBLIC_KEY=pk-lf-...
-LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_HOST=http://localhost:3000  # default
-```
-
-*Note on Testing: The test suite automatically disables external telemetry network requests via LANGFUSE_SDK_DISABLED=true in tests/conftest.py to prevent suite latency or external network dependency failures.*
-
-Traces are automatically exported as nested spans within the main request trace, giving you full visibility into:
-- Which path (System 1 vs System 2) was taken and why
-- LLM latency and token usage for each agent call
-- OPA policy evaluation timing and outcomes
-- GraphRAG retrieval results
-- Critic approval/rewrite decisions
-
----
-
-## Production Readiness
-
-### Checklist (19/19 items passing)
+## Production Readiness Checklist
 
 | Priority | Item | Status |
 |----------|------|--------|
-| **P0** | OPA policy drift bug (total_purchases gate) | Fixed |
-| **P0** | LangGraph PostgreSQL checkpointing | Fixed |
-| **P1** | Deterministic action idempotency keys | Fixed |
-| **P1** | OPA timeout & async fallback (50ms) | Fixed |
-| **P1** | Defensive timeouts (critic 15s, evaluator 30s, Neo4j 5s) | Fixed |
-| **P1** | LLM concurrency limiter (Semaphore) | Fixed |
-| **P1** | Read-replica support for evaluator | Fixed |
-| **P2** | State bounding (MAX_STATE_EVENTS=50) | Fixed |
-| **P2** | Event store TTL cleanup (24h) | Fixed |
-| **P2** | Prometheus drift gauge + batch metrics | Fixed |
-| **P2** | Prompt injection security test suite | Fixed |
+| **P0** | `eval()` RCE patched → `json.loads()` | ✅ Fixed |
+| **P0** | OPA policy deny rules enforced (Rego v1) | ✅ Fixed |
+| **P0** | OPA client package name aligned | ✅ Fixed |
+| **P0** | Deterministic action idempotency keys | ✅ Fixed |
+| **P0** | ActionDispatcher singleton (suppression works) | ✅ Fixed |
+| **P1** | LangGraph PostgreSQL checkpointing | ✅ Fixed |
+| **P1** | OPA timeout & async fallback (50ms) | ✅ Fixed |
+| **P1** | Defensive timeouts (critic 15s, evaluator 30s, Neo4j 5s) | ✅ Fixed |
+| **P1** | LLM concurrency limiter (Semaphore) | ✅ Fixed |
+| **P1** | SQLite async I/O (`asyncio.to_thread`) | ✅ Fixed |
+| **P1** | Orchestrator wired into REST API | ✅ Fixed |
+| **P2** | State bounding (`MAX_STATE_EVENTS=50`) | ✅ Fixed |
+| **P2** | Event store TTL cleanup (24h) | ✅ Fixed |
+| **P2** | Platt scaling sigmoid calibration | ✅ Fixed |
+| **P2** | Deterministic rule classifier tie-breaking | ✅ Fixed |
+| **P2** | Per-instance OPA HTTP client | ✅ Fixed |
+| **P2** | Prometheus metrics instrumented | ✅ Fixed |
+| **P3** | CORS configurable origins | ✅ Fixed |
+| **P3** | Secrets removed from config defaults | ✅ Fixed |
 
-### Key Hardening Details
-
-- **OPA**: Singleton `httpx.AsyncClient` with connection pooling; 50ms timeout with `asyncio.to_thread` fallback
-- **Checkpointing**: `PostgresSaver` with `autocommit=True, prepare_threshold=0`; `MemorySaver` fallback
-- **Idempotency**: SHA-256 deterministic keys allow `ON CONFLICT` deduplication in PostgreSQL
-- **State Bounding**: `MAX_STATE_EVENTS=50` truncation prevents checkpoint bloat
-- **Event TTL**: `delete_expired_events(ttl_hours=24)` prevents unbounded SQLite growth
-- **Concurrency**: `asyncio.Semaphore(10)` on evaluator LLM calls prevents OOM under burst
-- **Read Replicas**: Evaluator batch reads route to configured replica to avoid hot-path lock contention
+**Test Suite: 261/261 passing | Coverage: 71%**
 
 ---
 
-## Installation
+## Quick Start
 
 ### Prerequisites
 
 - Python 3.11+
-- Docker & Docker Compose (for Kafka + OPA + Zookeeper)
+- Docker & Docker Compose (for Kafka + OPA)
 - (Optional) Ollama for local LLM inference
 - (Optional) PostgreSQL for checkpointing and audit ledger
 - (Optional) Neo4j for GraphRAG product retrieval
-- (Optional) Langfuse for observability
 
-### Quick Start
+### Installation
 
 ```bash
 # 1. Clone repository
@@ -250,7 +159,7 @@ source .venv/bin/activate
 # 3. Install dependencies
 pip install -e ".[dev]"
 
-# 4. Start infrastructure (Kafka + Zookeeper + OPA)
+# 4. Start infrastructure (Kafka + OPA)
 docker compose -f docker/docker-compose.yml up -d
 
 # 5. Configure environment
@@ -268,20 +177,7 @@ python scripts/train_model.py
 # Saves models/intent_classifier.joblib
 ```
 
-### With Langfuse Observability
-
-```bash
-# Start Langfuse (self-hosted or cloud)
-docker compose -f docker/docker-compose.langfuse.yml up -d
-
-# Add to .env
-echo "LANGFUSE_PUBLIC_KEY=pk-lf-..." >> .env
-echo "LANGFUSE_SECRET_KEY=sk-lf-..." >> .env
-```
-
----
-
-## API Reference
+### API Reference
 
 Interactive docs: `http://localhost:8000/docs`
 
@@ -300,13 +196,14 @@ curl -X POST http://localhost:8000/events/ingest \
   }'
 ```
 
-### Intent Prediction
+### Intent Prediction (Dual-Path Orchestrator)
 
 ```bash
 curl http://localhost:8000/sessions/sess_001/intent
 ```
 
 **Response:**
+
 ```json
 {
   "session_id": "sess_001",
@@ -320,8 +217,7 @@ curl http://localhost:8000/sessions/sess_001/intent
     "checkouts": 1,
     "total_cart_value": 199.98
   },
-  "predicted_next_state": "PURCHASE",
-  "generated_at": "2024-01-15T10:30:00Z"
+  "predicted_next_state": "PURCHASE"
 }
 ```
 
@@ -353,23 +249,25 @@ curl http://localhost:8000/health
 
 ## Testing
 
-```bash
-# Run full test suite
-pytest tests/ -v
+### Full Test Suite
 
-# Run with coverage
+```bash
+# Run all tests with coverage
 pytest tests/ -v --cov=src --cov-report=term-missing
 
 # Run specific test categories
-pytest tests/test_critic_security.py -v  # Prompt injection security tests
-pytest tests/test_evaluator.py -v        # Evaluator agent tests
-pytest tests/test_orchestrator.py -v     # Orchestrator graph tests
+pytest tests/test_critic_security.py -v      # Prompt injection security tests
+pytest tests/test_evaluator.py -v            # Evaluator agent tests
+pytest tests/test_orchestrator.py -v         # Orchestrator graph tests
+pytest tests/test_governance.py -v           # OPA + business rules tests
+pytest tests/test_latency_benchmark.py -v    # Performance regression tests
+pytest tests/test_integration.py -v          # End-to-end flows
 ```
 
-### Test Suite: 226/226 Passing
+### Test Suite Breakdown (261 Tests)
 
-| Test Category | Count | Coverage |
-|---------------|-------|----------|
+| Category | Count | Coverage |
+|----------|-------|----------|
 | Evaluator Agent | 29 | Core batch processing, drift detection, LLM analysis |
 | Evaluator Worker | 8 | Lifecycle, Prometheus metrics, error handling |
 | Critic Agent | 12 | OPA validation, rewrite, hard rejection |
@@ -384,42 +282,127 @@ pytest tests/test_orchestrator.py -v     # Orchestrator graph tests
 | Governance | 12 | OPA client, business rules |
 | Integration | 12 | End-to-end flows |
 | Benchmarks | 18 | Latency regression tests |
+| Feature Engineering | 11 | Polars performance, edge cases |
+| Kafka Ingestion | 16 | Producer, consumer, lifecycle, malformed handling |
+| SLM Enrichment | 20 | Search query enrichment, intent signals, caching |
 
 ---
 
-## Synthetic Data & Model Performance
+## Observability
 
-### Dataset
+### Langfuse — Distributed Tracing
 
-- **Total events:** 34,148
-- **Total sessions:** 5,000
-- **Dataset:** `data/synthetic_clicks.csv`
+Langfuse provides end-to-end visibility into the dual-path pipeline:
 
-### Intent Distribution
+```
+       ┌─────────────────────────────────────────────────────────┐
+       │                   FastAPI / API Route                   │
+       └────────────────────────────┬────────────────────────────┘
+                                    │
+            ┌───────────────────────┴───────────────────────┐
+            ▼                                               ▼
+┌─────────────────────────┐                     ┌─────────────────────────┐
+│       System 1          │                     │        System 2         │
+│  Fast-Path / OPA Policy │                     │  LangGraph Multi-Agent  │
+└───────────┬─────────────┘                     └───────────┬─────────────┘
+            │                                               │
+            ▼                                               ▼
+   [@observe Decorator]                          [Langfuse CallbackHandler]
+   - Latency tracking (<15ms)                    - Node-by-node state spans
+   - Fallback evaluations                        - Graph state inputs/outputs
+            │                                               │
+            └───────────────────────┬───────────────────────┘
+                                    │
+                                    ▼
+                      ┌───────────────────────────┐
+                      │      Langfuse Cloud       │
+                      │  Tracing & Analytics UI   │
+                      └───────────────────────────┘
+```
 
-| Intent Category | Count |
-|-----------------|------:|
-| BROWSE | 7,180 |
-| PRICE_SENSITIVE | 7,070 |
-| COMPARE | 6,880 |
-| CART_BUILDER | 5,824 |
-| CHECKOUT_INTENT | 3,610 |
-| LOYAL_RETURNER | 2,130 |
-| CHURN_RISK | 1,454 |
+**Setup:**
 
-### Classification Report
+```bash
+# Option A: Langfuse Cloud (recommended for quick start)
+# Sign up at https://cloud.langfuse.com → Create project → Copy keys
 
-| Class | Precision | Recall | F1-score | Support |
-|-------|----------:|-------:|---------:|--------:|
-| BROWSE | 1.00 | 1.00 | 1.00 | 144 |
-| CART_BUILDER | 1.00 | 1.00 | 1.00 | 146 |
-| CHECKOUT_INTENT | 1.00 | 1.00 | 1.00 | 144 |
-| CHURN_RISK | 1.00 | 1.00 | 1.00 | 145 |
-| COMPARE | 1.00 | 1.00 | 1.00 | 138 |
-| LOYAL_RETURNER | 1.00 | 1.00 | 1.00 | 142 |
-| PRICE_SENSITIVE | 1.00 | 1.00 | 1.00 | 141 |
+echo "LANGFUSE_PUBLIC_KEY=pk-lf-..." >> .env
+echo "LANGFUSE_SECRET_KEY=sk-lf-..." >> .env
+echo "LANGFUSE_HOST=https://cloud.langfuse.com" >> .env
 
+# Option B: Self-hosted
+# docker compose -f docker/docker-compose.langfuse.yml up -d
+```
 
+**Traces Captured:**
+
+| Component | Tracing | What's Captured |
+|-----------|---------|-----------------|
+| **OPA Client** | `@observe()` | Evaluation latency, fallback path, allow/deny decisions |
+| **Classify Endpoint** | `@observe()` | Full request lifecycle for intent prediction |
+| **LangGraph Orchestrator** | `CallbackHandler` | Planner, GraphRAG tools, Critic agent as nested spans |
+| **Evaluator Agent** | `@observe()` | Background batch traces, LLM analysis spans |
+
+> **Note:** The test suite automatically disables external telemetry via `LANGFUSE_SDK_DISABLED=true` in `tests/conftest.py` to prevent suite latency or external network dependency failures.
+
+### Prometheus — Operational Metrics
+
+Prometheus metrics are exposed for scraping:
+
+```yaml
+# Add to your prometheus.yml:
+scrape_configs:
+  - job_name: "intent-transformer"
+    static_configs:
+      - targets: ["localhost:8000"]
+```
+
+**Available Metrics:**
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `http_requests_total` | Counter | Total HTTP requests by method/endpoint/status |
+| `http_request_duration_seconds` | Histogram | HTTP request latency |
+| `events_ingested_total` | Counter | Total click events ingested |
+| `intent_predictions_total` | Counter | Intent predictions by class |
+| `actions_dispatched_total` | Counter | Actions dispatched by type |
+| `actions_suppressed_total` | Counter | Actions suppressed by cooldown |
+| `evaluator_drift_flagged` | Gauge | Model drift indicator (1=drifted) |
+| `evaluator_batch_conversion_rate` | Gauge | Latest batch conversion rate |
+| `evaluator_actions_evaluated_total` | Counter | Total actions evaluated |
+
+---
+
+## Governance & Safety
+
+- **OPA/Rego v1 policies** with Python fallback for offline evaluation
+- **Anti-gaming:** No duplicate discounts within 15 minutes; max 3 discounts/month
+- **Fairness guardrails:** No demographic-based pricing discrimination
+- **Action suppression:** Deduplication within configurable time windows
+- **Audit trail:** Immutable ledger of every dispatched action with intent, confidence, and reason
+- **Deterministic idempotency:** SHA-256 keys from `session_id:action:minute_bucket` prevent duplicate actions
+- **Fail-closed:** OPA unreachable → deny high-risk actions (`APPLY_DISCOUNT`, `REFUND`, `CHARGEBACK`)
+
+---
+
+## Technology Stack
+
+| Category | Technology | Purpose |
+|----------|------------|---------|
+| **Runtime** | Python 3.11+ | Core language |
+| **API** | FastAPI + Uvicorn | Async HTTP server |
+| **Agentic** | LangGraph ≥0.2.0 | Stateful multi-agent orchestration |
+| **LLM** | Ollama / OpenAI | Local or cloud LLM inference |
+| **GraphRAG** | Neo4j | Product relationship queries |
+| **Policy** | OPA/Rego v1 | Governance & compliance rules |
+| **ML** | scikit-learn + XGBoost | Ensemble classification with Platt scaling |
+| **Features** | Polars | High-performance data processing |
+| **Streaming** | Apache Kafka (KRaft) | Clickstream event ingestion |
+| **Storage** | PostgreSQL + SQLite | Ledger, checkpointing, sessions |
+| **Cache** | Redis | Session state caching |
+| **Observability** | Langfuse | Distributed tracing & LLM monitoring |
+| **Metrics** | Prometheus | Operational metrics |
+| **Testing** | pytest + pytest-asyncio | 261 tests, 71% coverage |
 
 ---
 
@@ -437,253 +420,134 @@ real-time-intent-transformer/
 │   │       └── graph_retriever.py  # Neo4j GraphRAG tools
 │   ├── api/routes/
 │   │   ├── events.py            # Event ingestion endpoints
-│   │   ├── sessions.py          # Intent prediction endpoints
+│   │   ├── sessions.py          # Intent prediction (orchestrator)
 │   │   ├── intents.py           # Intent distribution
 │   │   ├── actions.py           # Action history
 │   │   ├── customers.py         # Customer profiles
 │   │   └── health.py            # Health checks
 │   ├── governance/
-│   │   ├── opa_client.py        # OPA/Rego policy engine
+│   │   ├── opa_client.py        # OPA/Rego policy engine (per-instance client)
 │   │   └── business_rules.py    # Python fallback rules
 │   ├── execution/
 │   │   ├── dispatcher.py        # Action dispatcher
 │   │   ├── suppressor.py        # Deduplication/suppression
-│   │   ├── ledger.py            # Audit ledger interface
-│   │   ├── pg_ledger.py         # PostgreSQL ledger
+│   │   ├── pg_ledger.py         # PostgreSQL ledger (immutable + status updates)
 │   │   └── sqlite_ledger.py     # SQLite ledger
 │   ├── memory/
-│   │   ├── session_store.py     # Session state store
-│   │   ├── event_store.py       # Event history store
-│   │   ├── customer_profile.py  # Customer profile store
-│   │   ├── redis_store.py       # Redis adapter
-│   │   └── sqlite_store.py      # SQLite adapter
+│   │   ├── session_store.py     # Session state store (async SQLite)
+│   │   ├── event_store.py       # Event history store (async SQLite)
+│   │   ├── sqlite_store.py      # SQLite async backend
+│   │   └── redis_store.py       # Redis backend
 │   ├── reasoning/
-│   │   ├── ml_ensemble.py       # ML ensemble classifier
+│   │   ├── ml_ensemble.py       # ML ensemble with Platt scaling
 │   │   ├── markov_model.py      # Markov chain predictor
-│   │   ├── rule_classifier.py   # Rule-based classifier
-│   │   └── slm_enrichment.py    # SLM enrichment (stub)
+│   │   ├── rule_classifier.py   # Rule-based classifier (deterministic ties)
+│   │   └── slm_enrichment.py    # SLM enrichment
 │   ├── perception/
-│   │   ├── feature_engineer.py  # Polars feature engineering
-│   │   └── session_window.py    # Sliding window manager
+│   │   └── feature_engineer.py  # Polars feature engineering
 │   ├── observability/
-│   │   ├── metrics.py           # Prometheus metrics
+│   │   ├── metrics.py           # Prometheus metrics (instrumented)
 │   │   └── logging.py           # Loguru configuration
 │   ├── ingestion/
-│   │   ├── kafka_consumer.py    # Kafka consumer
+│   │   ├── kafka_consumer.py    # Kafka consumer (async)
 │   │   └── kafka_producer.py    # Kafka producer
 │   ├── workers/
 │   │   └── evaluator_worker.py  # Background evaluator loop
 │   ├── models/                  # Pydantic data models
 │   ├── config.py                # Settings (pydantic-settings)
-│   ├── main.py                  # FastAPI application
+│   ├── main.py                  # FastAPI app (CORS + metrics middleware)
 │   └── pipeline.py              # System 1 hot-path pipeline
-├── tests/
-│   ├── test_critic_security.py  # Prompt injection security tests
-│   ├── test_evaluator.py        # Evaluator agent tests
-│   ├── test_evaluator_worker.py # Worker lifecycle tests
-│   ├── test_orchestrator.py     # Orchestrator graph tests
-│   ├── test_critic.py           # Critic agent tests
-│   ├── test_pipeline.py         # Pipeline tests
-│   ├── test_api.py              # API endpoint tests
-│   └── conftest.py              # Pytest fixtures + Langfuse disable
 ├── policies/
-│   └── ecommerce.rego           # OPA Rego policies
+│   └── ecommerce.rego           # OPA Rego v1 policies (deny guards)
+├── tests/                       # 261 tests, 100% pass rate
 ├── docker/
-│   └── docker-compose.yml       # Infrastructure services
+│   └── docker-compose.yml       # Kafka (KRaft) + OPA
 ├── scripts/
 │   ├── generate_clickstream.py  # Synthetic data generation
 │   └── train_model.py           # Model training
-├── pyproject.toml               # Project config + dependencies
+├── pyproject.toml               # Project config + pinned dependencies
 └── README.md
 ```
 
 ---
 
-## Technology Stack
+## Configuration
 
-| Category | Technology | Purpose |
-|----------|------------|---------|
-| **Runtime** | Python 3.11+ | Core language |
-| **API** | FastAPI + Uvicorn | Async HTTP server |
-| **Agentic** | LangGraph | Stateful multi-agent orchestration |
-| **LLM** | Ollama / OpenAI | Local or cloud LLM inference |
-| **GraphRAG** | Neo4j | Product relationship queries |
-| **Policy** | OPA/Rego | Governance & compliance rules |
-| **ML** | scikit-learn + XGBoost | Ensemble classification |
-| **Features** | Polars | High-performance data processing |
-| **Streaming** | Apache Kafka | Clickstream event ingestion |
-| **Storage** | PostgreSQL + SQLite | Ledger, checkpointing, sessions |
-| **Cache** | Redis | Session state caching |
-| **Observability** | Langfuse | Distributed tracing & LLM monitoring |
-| **Metrics** | Prometheus | Operational metrics |
-| **Testing** | pytest + pytest-asyncio | 226 tests, 79% coverage |
+Create `.env` from `.env.example`:
 
----
+```bash
+# Required
+DATABASE_URL=sqlite:///./intent_transformer.db
+OPA_URL=http://localhost:8181
 
-## Troubleshooting
+# LLM (Ollama local)
+LLM_PROVIDER=ollama
+LLM_MODEL=qwen3-coder:4b
+LLM_BASE_URL=http://localhost:11434/v1
 
-### Issue 1: `asyncio` RuntimeWarning — coroutine was never awaited
+# Optional: PostgreSQL for ledger + checkpointing
+USE_PG_LEDGER=false
+POSTGRES_DSN=postgresql://postgres:postgres@localhost:5432/intent_transformer
 
-**Task:** `fix: async/sync mismatch, eval() vuln, deprecation warnings, SLM enrichment` (`63561bb`)
+# Optional: Langfuse observability
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_HOST=https://cloud.langfuse.com
 
-**Symptom:**
-```
-RuntimeWarning: coroutine 'ChatOllama.ainvoke' was never awaited
-```
+# Optional: Redis for session caching
+USE_REDIS_STORE=false
+REDIS_URL=redis://localhost:6379/0
 
-**Root Cause:** The Critic agent, Evaluator agent, and Planner agent were calling `llm.invoke()` (synchronous) instead of `llm.ainvoke()` (async). In an async context, this returns a coroutine object instead of the actual result, causing silent failures and `RuntimeWarning`s.
+# CORS
+CORS_ORIGINS=["http://localhost:3000"]
 
-**Fix:** Replaced all `llm.invoke()` calls with `await llm.ainvoke()` across `critic.py`, `evaluator.py`, `planner.py`, `orchestrator.py`, and `graph_retriever.py`. Updated all test mocks from `mock_llm.invoke` → `mock_llm.ainvoke`.
-
-**Prevention:** Always use `ainvoke()` when calling LLMs from async functions. If you see "coroutine was never awaited" warnings, check that all LLM calls in async paths use the async variant.
-
----
-
-### Issue 2: Arbitrary code execution via `eval()` in event metadata
-
-**Task:** `fix: async/sync mismatch, eval() vuln, deprecation warnings, SLM enrichment` (`63561bb`)
-
-**Symptom:** Security vulnerability — user-supplied metadata was deserialized via `eval(metadata)`, allowing arbitrary Python code execution.
-
-**Root Cause:** `src/ingestion/event_store.py` used `eval()` to parse metadata strings stored in the database.
-
-**Fix:** Replaced `eval(metadata)` with `json.loads(metadata)`. Also replaced `str(metadata)` with `json.dumps(metadata)` for correct JSON serialization when writing to the database.
-
-**Prevention:** Never use `eval()` or `exec()` on user-supplied data. Always use `json.loads()` / `json.dumps()` for structured data. Run `bandit` or similar SAST tools to catch these patterns.
-
----
-
-### Issue 3: `datetime.utcnow()` deprecation warnings
-
-**Task:** `fix: async/sync mismatch, eval() vuln, deprecation warnings, SLM enrichment` (`63561bb`)
-
-**Symptom:**
-```
-DeprecationWarning: datetime.utcnow() is deprecated
-```
-
-**Root Cause:** Python 3.12+ deprecates `datetime.utcnow()` in favor of `datetime.now(timezone.utc)`.
-
-**Fix:** Replaced all `datetime.utcnow()` calls with `datetime.now(UTC)` across `suppressor.py`, `session_store.py`, and related modules. Added missing `timedelta` import where needed.
-
----
-
-### Issue 4: Kafka consumer fails to start — `NoBrokersAvailable`
-
-**Task:** `feat: add Kafka ingestion pipeline and streaming simulator` (`d7d56ed`)
-
-**Symptom:**
-```
-kafka.errors.NoNoBrokersAvailable: NoBrokersAvailable
-```
-
-**Root Cause:** The Kafka consumer was hardcoded to `localhost:9092` and couldn't connect when the broker was running in Docker with a different network address.
-
-**Fix:** Updated `kafka_consumer.py` to read `KAFKA_BOOTSTRAP_SERVERS` from environment variable (defaults to `localhost:9092`). Added `__main__.py` for `python -m src.ingestion` execution. Created `simulate_stream.py` for local testing without a full Kafka cluster.
-
----
-
-### Issue 5: OPA `allow`/`deny` rules silently ignored (Rego v0 → v1)
-
-**Task:** `refactor: governance overhaul` (`aa3d6d2`)
-
-**Symptom:** OPA evaluates all inputs as `allow = false` despite seemingly correct policy rules. No errors in logs.
-
-**Root Cause:** OPA 0.60+ deprecated the `allow { ... }` syntax (v0) in favor of `allow if { ... }` (v1). When OPA loads v0 syntax in newer versions, rules parse without errors but never match — they're silently ignored.
-
-**Fix:** Updated all rules in `policies/ecommerce.rego` from v0 to v1 syntax:
-```rego
-# Before (silently broken)
-allow { input.action == "APPLY_DISCOUNT" ... }
-
-# After (working)
-allow if { input.action == "APPLY_DISCOUNT" ... }
-```
-
-**Prevention:** Pin your OPA version and test policies against the exact version. Run `opa test policies/` after any policy change.
-
----
-
-### Issue 6: OPA unreachable — actions silently allowed via Python fallback
-
-**Task:** `refactor: governance overhaul` (`aa3d6d2`)
-
-**Symptom:** When OPA is down or unreachable, discount actions are dispatched anyway. No audit trail of the governance bypass.
-
-**Root Cause:** `OPAClient.evaluate()` caught all exceptions and fell back to a Python rules engine (`_python_fallback`). This meant OPA downtime was invisible — actions passed governance checks based on a duplicated rules implementation that could drift from the canonical Rego policies.
-
-**Fix:** Removed the Python fallback entirely. OPA is now the single source of truth. On `ConnectError`, `TimeoutException`, or `HTTPStatusError`, `evaluate()` returns `False` (fail-closed). High-risk actions (`APPLY_DISCOUNT`, `REFUND`, `CHARGEBACK`) are explicitly flagged in error logs.
-
----
-
-### Issue 7: Docker Compose Kafka fails — Zookeeper dependency removed upstream
-
-**Task:** `refactor: governance overhaul` (`aa3d6d2`)
-
-**Symptom:**
-```
-Error response from daemon: manifest for confluentinc/cp-zookeeper:7.6.0 not found
-```
-or Kafka fails to find Zookeeper and never becomes healthy.
-
-**Root Cause:** The docker-compose.yml used Confluent's Zookeeper + Kafka two-container setup. Newer Confluent images deprecate Zookeeper in favor of KRaft mode.
-
-**Fix:** Replaced the two-container Zookeeper+Kafka setup with a single Apache Kafka container running in KRaft mode (no Zookeeper). OPA container updated to mount the entire `/policies/` directory instead of a single file.
-
-```yaml
-# Before: two services
-services:
-  zookeeper: ...
-  kafka: ... (depends_on: zookeeper)
-
-# After: single service
-services:
-  kafka:
-    image: apache/kafka:latest
-    environment:
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+# Routing threshold
+SYSTEM_2_CONFIDENCE_THRESHOLD=0.70
 ```
 
 ---
 
-### Issue 8: Test `test_opa_evaluation_called_with_correct_args` fails after OPA refactor
+## Recent Hardening & Audit
 
-**Task:** `refactor: governance overhaul` (`aa3d6d2`)
+This repository underwent a comprehensive security and architectural audit. Key fixes applied:
 
-**Symptom:**
+- **Security:** Removed `eval()` RCE vulnerability; replaced with `json.loads()`
+- **Governance:** Fixed OPA Rego v1 deny rules to actually block violations; aligned package names
+- **Architecture:** Wired LangGraph orchestrator into REST API; System 2 is now reachable
+- **Performance:** SQLite I/O offloaded to thread pool; async event loop no longer blocked
+- **Statistics:** Added Platt scaling sigmoid calibration; removed +1 smoothing bias
+- **Correctness:** Deterministic tie-breaking in rule classifier; per-instance HTTP clients
+- **Observability:** Instrumented Prometheus metrics; configurable CORS
+- **Testing:** 261 tests passing, 0 failures
+
+---
+
+## Performance Benchmarks
+
+| Metric | Target | Actual |
+|--------|--------|--------|
+| System 1 latency (p95) | <50ms | ~15-30ms |
+| System 2 latency (p95) | <5s | ~1-3s (local LLM) |
+| OPA evaluation | <15ms | ~5-10ms |
+| Feature engineering | <5ms | ~2-3ms |
+| Throughput | 1K events/sec | TBD |
+
+```bash
+# Run benchmarks
+pytest tests/test_latency_benchmark.py -v
 ```
-AssertionError: Expected 'mock' to be called once. Called 0 times.
-```
-
-**Root Cause:** The `OPAClient.evaluate()` signature changed from positional args `(action, customer, features)` to keyword args `(action=, intent=, discount_value=, customer=, features=)`. The test mock assertion still expected the old positional signature.
-
-**Fix:** Updated `tests/test_critic.py` to assert the new keyword argument signature:
-```python
-# Before
-mock_opa.evaluate.assert_called_once_with("APPLY_DISCOUNT", customer, features)
-
-# After
-mock_opa.evaluate.assert_called_once_with(
-    action="APPLY_DISCOUNT",
-    intent=features.get("intent", ""),
-    discount_value=features.get("discount_value", 0.0),
-    customer=customer,
-    features=features,
-)
-```
-
-**Prevention:** When refactoring function signatures, always search the test suite for mock assertions using `grep "assert_called" tests/`.
 
 ---
 
 ## Contributing
 
 Contributions welcome in:
+
 - Additional intent classes (BARGAIN_HUNTER, GIFT_SHOPPER)
 - Real-time bidding (RTB) integration patterns
 - Multi-modal intent (image search, voice queries)
 - Reinforcement learning for action optimization
+- Redis-backed suppressor for horizontal scaling
 - Load testing and performance benchmarks
 
 ---
