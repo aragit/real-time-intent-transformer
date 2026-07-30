@@ -621,7 +621,7 @@ If you use this software in your research or product, please cite it. Click the 
 }
 ```
 
-> **Citation format:** [CITATION.cff](CITATION.cff) (GitHub renders a "Cite this repository" button automatically from this file)
+> **Citation format:** [CITATION.cff](CITATION.cff) 
 
 ---
 
